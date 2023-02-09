@@ -12,10 +12,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include=".\src\inetops.cpp">
+    <ClCompile Include="src\main.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\ini.cpp">
+    <ClCompile Include="..\routine\src\routine.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\routine\src\rapp.c">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="src\cjson.c">
@@ -23,16 +26,31 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include=".\src\inetops.h">
+    <ClInclude Include="src\main.h">
       <Filter>Header</Filter>
     </ClInclude>
     <ClInclude Include=".\src\resource.h">
       <Filter>Header</Filter>
     </ClInclude>
-    <ClInclude Include="src\ini.h">
+    <ClInclude Include="..\routine\src\ntapi.h">
       <Filter>Header</Filter>
     </ClInclude>
-    <ClInclude Include="src\about.h">
+    <ClInclude Include="..\routine\src\ntrtl.h">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\routine\src\rapp.h">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\routine\src\rconfig.h">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\routine\src\routine.h">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\routine\src\rtypes.h">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app.h">
       <Filter>Header</Filter>
     </ClInclude>
     <ClInclude Include="src\cjson.h">
