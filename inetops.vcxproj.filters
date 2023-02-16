@@ -12,9 +12,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\main.c">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\routine\src\routine.c">
       <Filter>Source</Filter>
     </ClCompile>
@@ -22,6 +19,9 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="src\cjson.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.c">
       <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
