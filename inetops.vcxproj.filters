@@ -18,9 +18,6 @@
     <ClCompile Include="..\routine\src\rapp.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="src\cjson.c">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="src\main.c">
       <Filter>Source</Filter>
     </ClCompile>
@@ -51,9 +48,6 @@
       <Filter>Header</Filter>
     </ClInclude>
     <ClInclude Include="src\app.h">
-      <Filter>Header</Filter>
-    </ClInclude>
-    <ClInclude Include="src\cjson.h">
       <Filter>Header</Filter>
     </ClInclude>
   </ItemGroup>

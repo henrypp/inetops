@@ -328,7 +328,6 @@
     <ClInclude Include="..\routine\src\rtypes.h" />
     <ClInclude Include=".\src\resource.h" />
     <ClInclude Include="src\app.h" />
-    <ClInclude Include="src\cjson.h" />
     <ClInclude Include="src\main.h" />
   </ItemGroup>
   <ItemGroup>
@@ -337,7 +336,6 @@
   <ItemGroup>
     <ClCompile Include="..\routine\src\rapp.c" />
     <ClCompile Include="..\routine\src\routine.c" />
-    <ClCompile Include="src\cjson.c" />
     <ClCompile Include="src\main.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
