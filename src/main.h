@@ -1,8 +1,7 @@
 ﻿// InetOps
 // Copyright (c) 2012-2023 Henry++
 
-#ifndef __INETOPS_H__
-#define __INETOPS_H__
+#pragma once
 
 // libs
 #pragma comment(lib, "msimg32.lib")
@@ -111,5 +110,3 @@ WHOIS_LIST whois_servers[WHOIS_COUNT] = {0};
 //        u_short sa_family;              /* address family */
 //        char    sa_data[14];            /* up to 14 bytes of direct address */
 //} sockaddr, *psockaddr;
-
-#endif // __INETOPS_H__
