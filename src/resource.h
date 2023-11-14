@@ -15,8 +15,8 @@
 #define IDD_PAGE_URLDECODER 103
 #define IDD_PAGE_HOSTADDR 104
 #define IDD_PAGE_URLINFO 105
-#define IDD_PAGE_IP 106
-#define IDD_PAGE_WHOIS 107
+#define IDD_PAGE_WHOIS 106
+#define IDD_PAGE_IP 107
 #define IDD_PAGE_SHAREDINFO 108
 #define IDD_PAGE_SYSINFO 109
 #define IDD_PAGE_TCP_STATISTIC 110
@@ -27,10 +27,11 @@
 // Menu Id
 #define IDM_MAIN 100
 #define IDM_LISTVIEW 101
+#define IDM_COPY 102
+#define IDM_SELECT_ALL 103
 
-// Page Controls
-#define IDC_TITLE 100
-#define IDC_DESCRIPTION 101
+//#define IDM_COPY_VALUE 103
+//#define IDM_SAVE_AS 104
 
 // Main Menu
 #define IDM_EXIT 40000
@@ -41,6 +42,15 @@
 #define IDM_ABOUT 40005
 #define IDM_REFRESH 40006
 #define IDM_ZOOM 40007
+
+// Main Dlg
+#define IDC_ITEMLIST 100
+#define IDC_STATUSBAR 101
+
+// Settings Dlg
+#define IDC_NAV 100
+#define IDC_RESET 101
+#define IDC_CLOSE 102
 
 // Ping Page
 #define IDC_PING_HOST 102
@@ -76,55 +86,38 @@
 #define IDC_URLINFO_HEADER 124
 #define IDC_URLINFO_HEADER_CHK 125
 #define IDC_URLINFO_START 126
-#define IDC_URLINFO_CLEAR 127
 
 // Ip Page
-#define IDC_IP_RESULT 128
-#define IDC_IP_EXTERNAL_CHK 129
-#define IDC_IP_REFRESH 130
+#define IDC_IP_RESULT 127
+#define IDC_IP_EXTERNAL_CHK 128
+#define IDC_IP_REFRESH 129
 
 // Whois Page
-#define IDC_WHOIS_HOST 131
-#define IDC_WHOIS_SERVER 132
-#define IDC_WHOIS_RESULT 133
-#define IDC_WHOIS_START 134
-#define IDC_WHOIS_CLEAR 135
+#define IDC_WHOIS_HOST 130
+#define IDC_WHOIS_SERVER 131
+#define IDC_WHOIS_RESULT 132
+#define IDC_WHOIS_START 133
+#define IDC_WHOIS_CLEAR 134
 
 // System Info Page
-#define IDC_SYSINFO 136
+#define IDC_SYSINFO 135
 
 // Tcp Statistic Page
-#define IDC_TCP_STATISTIC 137
-#define IDC_TCP_STATISTIC_CHK 138
+#define IDC_TCP_STATISTIC 136
 
 // Udp Statistic Page
-#define IDC_UDP_STATISTIC 139
-#define IDC_UDP_STATISTIC_CHK 140
+#define IDC_UDP_STATISTIC 138
 
 // Icmp Statistic Page
-#define IDC_ICMP_STATISTIC 141
-#define IDC_ICMP_STATISTIC_CHK 142
+#define IDC_ICMP_STATISTIC 140
 
 // Ip Statistic Page
-#define IDC_IP_STATISTIC 143
-#define IDC_IP_STATISTIC_CHK 144
+#define IDC_IP_STATISTIC 142
 
 
-#define IDC_SHAREDINFO 145
-#define IDC_SHAREDINFO_START 146
-#define IDC_SHAREDINFO_CLEAR 147
-
-
-// Main Window
-#define IDC_ITEMLIST 100
-#define IDC_STATUSBAR 101
-
-
-
-// List-View Menu
-#define IDC_LISTVIEW_COPY 1000
-#define IDC_LISTVIEW_COPY_VALUE 1001
-#define IDC_LISTVIEW_SAVE_AS 1002
+#define IDC_SHAREDINFO 144
+#define IDC_SHAREDINFO_START 145
+#define IDC_SHAREDINFO_CLEAR 146
 
 // Icons
 #define IDI_MAIN 100
