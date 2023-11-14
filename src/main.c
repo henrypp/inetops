@@ -223,7 +223,7 @@ NTSTATUS GetPing (
 	ULONG ip;
 	ULONG status;
 	LONG retries;
-	INT item = 0;
+	INT item_id = 0;
 
 	hwnd = (HWND)lparam;
 
@@ -308,23 +308,23 @@ NTSTATUS GetPing (
 						{
 							case IP_SUCCESS:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", icmp_reply->DataSize);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item, 1, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->Options.Tos);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item, 2, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->Options.Ttl);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item, 3, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer);
 
 								break;
 							}
 
 							case IP_REQ_TIMED_OUT:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item, L"Timeout", IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, L"Timeout", IL_FAULT, I_GROUPIDNONE, 0);
 								break;
 							}
 
@@ -332,13 +332,13 @@ NTSTATUS GetPing (
 							{
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", icmp_reply->Status);
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item, buffer, IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_GROUPIDNONE, 0);
 
 								break;
 							}
 						}
 
-						item += 1;
+						item_id += 1;
 					}
 					else if (ptr->ai_family == AF_INET6)
 					{
@@ -370,23 +370,23 @@ NTSTATUS GetPing (
 							case IP_SUCCESS:
 							{
 								//_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", icmp_reply->DataSize);
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", icmp_reply->DataSize);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item, 1, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->RoundTripTime);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item, 2, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->Options.Ttl);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item, 3, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer);
 
 								break;
 							}
 
 							case IP_REQ_TIMED_OUT:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item, L"Timeout", IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, L"Timeout", IL_FAULT, I_GROUPIDNONE, 0);
 								break;
 							}
 
@@ -394,13 +394,13 @@ NTSTATUS GetPing (
 							{
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", icmp_reply->Status);
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item, buffer, IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_GROUPIDNONE, 0);
 
 								break;
 							}
 						}
 
-						item += 1;
+						item_id += 1;
 					}
 				}
 			}
@@ -438,12 +438,12 @@ NTSTATUS GetExternalIp (
 	HINTERNET hsession;
 	HINTERNET hconnect;
 	HINTERNET hrequest;
-	CHAR buffer2[4096];
+	CHAR buffer2[4096] = {0};
 	CHAR buffer[256];
 	PR_STRING address;
 	ULONG readed;
 	ULONG status;
-	INT item;
+	INT item_id = 0;
 	BOOLEAN result = FALSE;
 
 	hwnd = (HWND)lparam;
@@ -455,9 +455,7 @@ NTSTATUS GetExternalIp (
 	hsession = _r_inet_createsession (NULL);
 
 	if (!hsession)
-		return 212;
-
-	RtlZeroMemory (buffer2, sizeof (buffer2));
+		return STATUS_NETWORK_BUSY;
 
 	address = _r_obj_createstring (IP_ADDRESS);
 
@@ -480,51 +478,17 @@ NTSTATUS GetExternalIp (
 				break;
 		}
 
-		//json = cJSON_Parse (buffer2);
-
-		//if (json)
-		{
-			result = TRUE;
-
-			item = 0;
-
-			//Lv_InsertItemA (hwnd, IDC_IP_RESULT, cJSON_GetObjectItem (json, "ip")->valuestring, item++, 1);
-			//Lv_InsertItemA (hwnd, IDC_IP_RESULT, cJSON_GetObjectItem (json, "proxy")->valuestring, item++, 1);
-			//Lv_InsertItemA (hwnd, IDC_IP_RESULT, cJSON_GetObjectItem (json, "isp")->valuestring, item++, 1);
-			//Lv_InsertItemA (hwnd, IDC_IP_RESULT, cJSON_GetObjectItem (json, "org")->valuestring, item++, 1);
-
-			//StringCchPrintfA (
-			//	buffer,
-			//	RTL_NUMBER_OF (buffer),
-			//	"%s (%s) [%s]",
-			//	cJSON_GetObjectItem (json, "city")->valuestring,
-			//	cJSON_GetObjectItem (json, "country")->valuestring,
-			//	_strupr (cJSON_GetObjectItem (json, "ccode")->valuestring)
-			//);
-
-			//Lv_InsertItemA (hwnd, IDC_IP_RESULT, buffer, item++, 1);
-			//
-			//StringCchPrintfA (
-			//	buffer,
-			//	RTL_NUMBER_OF (buffer),
-			//	"longitude (%s), latitude (%s)",
-			//	cJSON_GetObjectItem (json, "long")->valuestring,
-			//	cJSON_GetObjectItem (json, "lat")->valuestring
-			//);
-			//
-			//Lv_InsertItemA (hwnd, IDC_IP_RESULT, buffer, item++, 1);
-			//
-			//cJSON_Delete (json);
-		}
+		result = TRUE;
 	}
 
 	if (!result)
 		_r_listview_fillitems (hwnd, IDC_IP_RESULT, -1, -1, 1, L"Error...", IL_FAULT);
 
+	_r_ctrl_enable (hwnd, IDC_IP_REFRESH, TRUE);
+
 	_r_inet_close (hsession);
 	_r_inet_close (hconnect);
-
-	_r_ctrl_enable (hwnd, IDC_IP_REFRESH, TRUE);
+	_r_inet_close (hrequest);
 
 	_r_obj_dereference (address);
 
@@ -542,7 +506,7 @@ NTSTATUS GetDownloadSpeed (
 	PR_STRING url;
 	SYSTEMTIME st = {0};
 	WCHAR buffer[256] = {0};
-	CHAR buff[4096] = {0};
+	BYTE buff[0x8000] = {0};
 	ULONG_PTR page_id;
 	ULONG total_size = 0;
 	ULONG recieved = 0;
@@ -553,9 +517,9 @@ NTSTATUS GetDownloadSpeed (
 	LARGE_INTEGER p1 = {0};
 	LARGE_INTEGER p2 = {0};
 	LARGE_INTEGER freq = {0};
+	ULONG limit;
+	INT item_id;
 	ULONG status;
-	LONG limit;
-	INT item = 0;
 
 	hwnd = (HWND)lparam;
 	limit = _r_ctrl_getinteger (hwnd, IDC_SPEEDMETER_LIMIT, NULL);
@@ -580,26 +544,18 @@ NTSTATUS GetDownloadSpeed (
 
 	if (status == ERROR_SUCCESS)
 	{
-		GetLocalTime (&st);
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
-
-		_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item, buffer);
-		_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item, 1, L"00:00:00");
-
-		QueryPerformanceCounter (&p1);
-		QueryPerformanceFrequency (&freq);
+		RtlQueryPerformanceCounter (&p1);
+		RtlQueryPerformanceCounter (&freq);
 
 		while (TRUE)
 		{
 			if (!page_list[page_id].thread)
 				break;
 
-			//if (limit && limit < seconds)
-			//	break;
-
 			if (_r_inet_readrequest (hrequest, buff, sizeof (buff), &recieved, &total_size))
 			{
-				QueryPerformanceCounter (&p2);
+				RtlQueryPerformanceCounter (&p2);
+
 				seconds = (ULONG)(((p2.QuadPart - p1.QuadPart) / (freq.QuadPart / 1000LL)) / 1000LL);
 
 				if (seconds)
@@ -613,32 +569,35 @@ NTSTATUS GetDownloadSpeed (
 						max_speed = temp;
 				}
 
+				item_id = 0;
+
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d kbps", min_speed);
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item, 1, buffer);
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 0, 1, buffer);
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d kbps", (min_speed + max_speed) / 2);
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item, 2, buffer);
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 1, 2, buffer);
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d kbps", max_speed);
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item, 3, buffer);
-
-				//_r_format_unixtime
-				buffer[0] = 0;
-				//time_format (seconds, buffer);
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item, 4, buffer);
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 2, 3, buffer);
 
 				_r_format_number (buffer, RTL_NUMBER_OF (buffer), total_size);
 				_r_str_append (buffer, RTL_NUMBER_OF (buffer), L" bytes");
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item, 5, buffer);
+
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 5, 5, buffer);
+			}
+			else
+			{
+				break;
 			}
 
-			item += 1;
+			if (limit && limit < seconds)
+				break;
 		}
 
 		GetLocalTime (&st);
 
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
-		_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item, 6, buffer);
+		_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, 6, buffer);
 	}
 	else
 	{
@@ -846,7 +805,7 @@ VOID GetSharedInfo (
 	ULONG readed;
 	ULONG resume_handle = 0;
 	ULONG total;
-	INT item = 0;
+	INT item_id = 0;
 
 	_r_listview_deleteallitems (hwnd, IDC_SHAREDINFO);
 
@@ -868,19 +827,19 @@ VOID GetSharedInfo (
 
 			for (ULONG i = 1; i <= readed; i++)
 			{
-				_r_listview_additem_ex (hwnd, IDC_SHAREDINFO, item, p->shi502_netname, IL_SUCCESS, I_GROUPIDNONE, 0);
-				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item, 1, p->shi502_path[0] ? p->shi502_path : SZ_UNKNOWN);
+				_r_listview_additem_ex (hwnd, IDC_SHAREDINFO, item_id, p->shi502_netname, IL_SUCCESS, I_GROUPIDNONE, 0);
+				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 1, p->shi502_path[0] ? p->shi502_path : SZ_UNKNOWN);
 
 				GetSharedType (buffer, RTL_NUMBER_OF (buffer), p->shi502_type);
-				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item, 2, buffer);
+				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 2, buffer);
 
 				if (p->shi502_max_uses == -1)
 					_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"unlimited");
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d/%s", p->shi502_current_uses, buffer);
-				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item, 3, buffer);
+				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 3, buffer);
 
-				item += 1;
+				item_id += 1;
 
 				p++;
 			}
@@ -904,10 +863,10 @@ VOID GetSysInfo (
 	ULONG out_length;
 	ULONG flags;
 	SOCKET sock;
-	INT item = 0;
+	INT item_id = 0;
 
 	_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d.%d", LOBYTE (wsa.wVersion), HIBYTE (wsa.wVersion));
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 
 	status = RtlGetVersion (&version_info);
 
@@ -922,7 +881,7 @@ VOID GetSysInfo (
 			version_info.dwBuildNumber
 		);
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 	}
 
 	flags = 0;
@@ -949,7 +908,7 @@ VOID GetSysInfo (
 		_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"Disabled");
 	}
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 
 	out_length = sizeof (FIXED_INFO);
 	network_params = _r_mem_allocate (out_length);
@@ -995,38 +954,38 @@ VOID GetSysInfo (
 			}
 		}
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, network_params->EnableRouting ? L"On" : L"Off");
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, network_params->EnableProxy ? L"On" : L"Off");
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, network_params->EnableDns ? L"On" : L"Off");
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableRouting ? L"On" : L"Off");
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableProxy ? L"On" : L"Off");
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableDns ? L"On" : L"Off");
 	}
 	else
 	{
 		_r_listview_fillitems (hwnd, IDC_SYSINFO, -1, -1, 1, L"n/a", IL_FAULT);
-		item += 4;
+		item_id += 4;
 	}
 
 	if (network_params)
 		_r_mem_free (network_params);
 
 	sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); // IPv4
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
 	closesocket (sock);
 
 	sock = socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP); // IPv6
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
 	closesocket (sock);
 
 	flags = RTL_NUMBER_OF (buffer);
 	GetUserName (buffer, &flags);
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 
-	Lv_InsertItemA (hwnd, IDC_SYSINFO, gethostname (szBufferA, RTL_NUMBER_OF (szBufferA)) ? "n/a" : szBufferA, item++, 1);
+	Lv_InsertItemA (hwnd, IDC_SYSINFO, gethostname (szBufferA, RTL_NUMBER_OF (szBufferA)) ? "n/a" : szBufferA, item_id++, 1);
 
 	flags = RTL_NUMBER_OF (buffer);
 	GetComputerNameEx (ComputerNameDnsHostname, buffer, &flags);
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 }
 
 VOID GetHostAddress (
@@ -1114,7 +1073,7 @@ NTSTATUS GetUrlInfo (
 	ULONG flags = 0;
 	ULONG length;
 	ULONG status;
-	INT item = 0;
+	INT item_id = 0;
 
 	hwnd = (HWND)lparam;
 
@@ -1149,11 +1108,11 @@ NTSTATUS GetUrlInfo (
 	{
 		StrFormatByteSizeW (flags, buffer, RTL_NUMBER_OF (buffer));
 
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
 	}
 
 	length = sizeof (st);
@@ -1164,23 +1123,23 @@ NTSTATUS GetUrlInfo (
 
 	if (timestamp && string)
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, string->buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, string->buffer);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
 	}
 
 	length = sizeof (buffer);
 	BOOL wu = WinHttpQueryOption (hrequest, WINHTTP_QUERY_ACCEPT_RANGES, &buffer, &length);
 
-	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, wu ? L"Supported" : L"Unsupported");
+	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, wu ? L"Supported" : L"Unsupported");
 
 	length = sizeof (buffer);
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_CONTENT_TYPE, &buffer, &length))
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 	}
 
 	length = sizeof (buffer);
@@ -1188,33 +1147,33 @@ NTSTATUS GetUrlInfo (
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_ETAG, &buffer, &length))
 	{
 		StrTrim (buffer, L"\""); // Strip Quotes
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
 	}
 
 	length = sizeof (buffer);
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_VERSION, &buffer, &length))
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
 	}
 
 	length = sizeof (buffer);
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_SERVER, &buffer, &length))
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
 	}
 
 	length = sizeof (flags);
@@ -1223,7 +1182,7 @@ NTSTATUS GetUrlInfo (
 
 	_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", status);
 
-	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 
 	if (url)
 		_r_obj_dereference (url);
@@ -1572,7 +1531,7 @@ VOID PrintIpStats (
 {
 	WCHAR buffer[100];
 	ULONG status;
-	INT item_id=0;
+	INT item_id = 0;
 
 	status = GetIpStatisticsEx (stats, AF_INET);
 
@@ -1802,12 +1761,13 @@ VOID CALLBACK TimerProc (
 	MIB_IPSTATS ip_stat;
 	ULONG_PTR dlg_id;
 
+	if (id_event != 1337)
+		return;
+
 	dlg_id = GetCurrentPage (hwnd);
 
 	hwnd = page_list[dlg_id].hpage;
 
-	if (id_event != 1337)
-		return;
 
 	switch (page_list[dlg_id].dlg_id)
 	{
@@ -1847,158 +1807,134 @@ VOID CALLBACK TimerProc (
 
 VOID InitializePages ()
 {
-	ULONG_PTR id;
+	ULONG_PTR idx = 0;
 
 	// whois servers
-	id = 0;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.verisign-grs.com");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.dotgov.gov");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.afilias.net");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.nic.kz");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.nic.name");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.pir.org");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.pir.org");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.tcinet.ru");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.ua");
-
-	id += 1;
-
-	_r_str_copy (whois_servers[id].server, RTL_NUMBER_OF (whois_servers[id].server), L"whois.website.ws");
-
-	id += 1;
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.verisign-grs.com");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.dotgov.gov");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.afilias.net");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.nic.kz");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.nic.name");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.pir.org");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.pir.org");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.tcinet.ru");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.ua");
+	_r_str_copy (whois_servers[idx++].server, RTL_NUMBER_OF (whois_servers[idx].server), L"whois.website.ws");
 
 	// categories
-	id = 0;
+	idx = 0;
 
-	_r_str_copy (category_list[id].name, RTL_NUMBER_OF (category_list[id].name), L"Tools");
-
-	id += 1;
-
-	_r_str_copy (category_list[id].name, RTL_NUMBER_OF (category_list[id].name), L"Information");
-
-	id += 1;
-
-	_r_str_copy (category_list[id].name, RTL_NUMBER_OF (category_list[id].name), L"Statistics");
+	_r_str_copy (category_list[idx++].name, RTL_NUMBER_OF (category_list[idx].name), L"Tools");
+	_r_str_copy (category_list[idx++].name, RTL_NUMBER_OF (category_list[idx].name), L"Information");
+	_r_str_copy (category_list[idx++].name, RTL_NUMBER_OF (category_list[idx].name), L"Statistics");
 
 	// pages
-	id = 0;
+	idx = 0;
 
-	page_list[id].dlg_id = IDD_PAGE_PING;
-	page_list[id].listview_id = IDC_PING_RESULT;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"Ping");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Диагностика доступности удаленных ресурсов");
+	page_list[idx].dlg_id = IDD_PAGE_PING;
+	page_list[idx].listview_id = IDC_PING_RESULT;
 
-	id += 1;
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Ping");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Диагностика доступности удаленных ресурсов");
 
-	page_list[id].dlg_id = IDD_PAGE_SPEEDMETER;
-	page_list[id].listview_id = IDC_SPEEDMETER_RESULT;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"Download speed");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Тестирование скорости загрузки данных из сети");
+	idx += 1;
 
-	id += 1;
+	page_list[idx].dlg_id = IDD_PAGE_SPEEDMETER;
+	page_list[idx].listview_id = IDC_SPEEDMETER_RESULT;
 
-	page_list[id].dlg_id = IDD_PAGE_URLDECODER;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"Url decoder");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Приведение ссылок из \"percent-encoding\" в нормальный вид");
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Download speed");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Тестирование скорости загрузки данных из сети");
 
-	id += 1;
+	idx += 1;
 
-	page_list[id].dlg_id = IDD_PAGE_URLINFO;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"Link information");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Получение списка IP адресов сайта");
+	page_list[idx].dlg_id = IDD_PAGE_URLDECODER;
 
-	id += 1;
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Url decoder");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Приведение ссылок из \"percent-encoding\" в нормальный вид");
 
-	page_list[id].dlg_id = IDD_PAGE_HOSTADDR;
-	page_list[id].listview_id = IDC_HOSTADDR_RESULT;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"Host address");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Вывод списка IP адресов в системе");
+	idx += 1;
 
-	id += 1;
+	page_list[idx].dlg_id = IDD_PAGE_URLINFO;
 
-	page_list[id].dlg_id = IDD_PAGE_WHOIS;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"Whois");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Получение регистрационных данных о владельцах доменных имен");
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Link information");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Получение списка IP адресов сайта");
 
-	id += 1;
+	idx += 1;
 
-	page_list[id].dlg_id = IDD_PAGE_IP;
-	page_list[id].category = 1;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"IP");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Вывод информации о общих ресурсах в системе");
+	page_list[idx].dlg_id = IDD_PAGE_HOSTADDR;
+	page_list[idx].listview_id = IDC_HOSTADDR_RESULT;
 
-	id += 1;
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Host address");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Вывод списка IP адресов в системе");
 
-	page_list[id].dlg_id = IDD_PAGE_SHAREDINFO;
-	page_list[id].listview_id = IDC_SHAREDINFO;
-	page_list[id].category = 1;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"Shared resources");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Вывод информации о общих ресурсах в системе");
+	idx += 1;
 
-	id += 1;
+	page_list[idx].dlg_id = IDD_PAGE_WHOIS;
 
-	page_list[id].dlg_id = IDD_PAGE_SYSINFO;
-	page_list[id].listview_id = IDC_SYSINFO;
-	page_list[id].category = 1;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"System");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Показ краткой информации о системе");
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Whois");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Получение регистрационных данных о владельцах доменных имен");
 
-	id += 1;
+	idx += 1;
 
-	page_list[id].dlg_id = IDD_PAGE_TCP_STATISTIC;
-	page_list[id].listview_id = IDC_TCP_STATISTIC;
-	page_list[id].category = 2;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"TCP");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Статистика использования TCP протокола");
+	page_list[idx].dlg_id = IDD_PAGE_IP;
+	page_list[idx].category = 1;
 
-	id += 1;
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"IP");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Вывод информации о общих ресурсах в системе");
 
-	page_list[id].dlg_id = IDD_PAGE_UDP_STATISTIC;
-	page_list[id].listview_id = IDC_UDP_STATISTIC;
-	page_list[id].category = 2;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"UDP");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Статистика использования UDP протокола");
+	idx += 1;
 
-	id += 1;
+	page_list[idx].dlg_id = IDD_PAGE_SHAREDINFO;
+	page_list[idx].listview_id = IDC_SHAREDINFO;
+	page_list[idx].category = 1;
 
-	page_list[id].dlg_id = IDD_PAGE_ICMP_STATISTIC;
-	page_list[id].listview_id = IDC_ICMP_STATISTIC;
-	page_list[id].category = 2;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"ICMP");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Статистика использования ICMP протокола");
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Shared resources");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Вывод информации о общих ресурсах в системе");
 
-	id += 1;
+	idx += 1;
 
-	page_list[id].dlg_id = IDD_PAGE_IP_STATISTIC;
-	page_list[id].listview_id = IDC_IP_STATISTIC;
-	page_list[id].category = 2;
-	_r_str_copy (page_list[id].title, RTL_NUMBER_OF (page_list[id].title), L"IP");
-	_r_str_copy (page_list[id].description, RTL_NUMBER_OF (page_list[id].description), L"Статистика использования IP");
+	page_list[idx].dlg_id = IDD_PAGE_SYSINFO;
+	page_list[idx].listview_id = IDC_SYSINFO;
+	page_list[idx].category = 1;
+
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"System");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Показ краткой информации о системе");
+
+	idx += 1;
+
+	page_list[idx].dlg_id = IDD_PAGE_TCP_STATISTIC;
+	page_list[idx].listview_id = IDC_TCP_STATISTIC;
+	page_list[idx].category = 2;
+
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"TCP");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования TCP протокола");
+
+	idx += 1;
+
+	page_list[idx].dlg_id = IDD_PAGE_UDP_STATISTIC;
+	page_list[idx].listview_id = IDC_UDP_STATISTIC;
+	page_list[idx].category = 2;
+
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"UDP");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования UDP протокола");
+
+	idx += 1;
+
+	page_list[idx].dlg_id = IDD_PAGE_ICMP_STATISTIC;
+	page_list[idx].listview_id = IDC_ICMP_STATISTIC;
+	page_list[idx].category = 2;
+
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"ICMP");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования ICMP протокола");
+
+	idx += 1;
+
+	page_list[idx].dlg_id = IDD_PAGE_IP_STATISTIC;
+	page_list[idx].listview_id = IDC_IP_STATISTIC;
+	page_list[idx].category = 2;
+
+	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"IP");
+	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования IP");
 }
 
 VOID InitializePage (
@@ -2007,7 +1943,7 @@ VOID InitializePage (
 )
 {
 	INT width;
-	INT item;
+	INT item_id;
 
 	//if (!IsWindowVisible (GetDlgItem (hwnd, page_id)))
 	//	return;
@@ -2049,17 +1985,17 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_SPEEDMETER_RESULT, 1, L"Time", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_SPEEDMETER_RESULT, 2, L"Other", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item++, L"Minimum", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item++, L"Average", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item++, L"Maximum", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Minimum", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Average", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Maximum", IL_SUCCESS, 0, 0);
 
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item++, L"Test started", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item++, L"Test finished", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item++, L"Execution time", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Test started", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Test finished", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Execution time", IL_SUCCESS, 1, 0);
 
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item++, L"Recieved data length", IL_SUCCESS, 2, 0);
+			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Recieved data length", IL_SUCCESS, 2, 0);
 
 			_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_LINK, _r_obj_getstring (_r_config_getstring (L"SpeedmeterLink", APP_HOST)));
 
@@ -2107,15 +2043,15 @@ VOID InitializePage (
 			for (ULONG_PTR i = 0; i < WHOIS_COUNT; i++)
 				SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_ADDSTRING, 0, (LPARAM)whois_servers[i].server);
 
-			item = _r_config_getlong (L"WhoisServer", 0);
+			item_id = _r_config_getlong (L"WhoisServer", 0);
 
-			if (item == CB_ERR)
+			if (item_id == CB_ERR)
 			{
 				_r_ctrl_setstring (hwnd, IDC_WHOIS_SERVER, _r_obj_getstring (_r_config_getstring (L"WhoisServerCustom", whois_servers[0].server)));
 			}
 			else
 			{
-				SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_SETCURSEL, item, 0);
+				SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_SETCURSEL, item_id, 0);
 			}
 
 			break;
@@ -2135,17 +2071,17 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_URLINFO_RESULT, 0, L"File information", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_URLINFO_RESULT, 1, L"Server information ", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Size", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Last-modified", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Resume downloading", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Content type", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Etag", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Size", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Last-modified", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Resume downloading", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Content type", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Etag", IL_SUCCESS, 0, 0);
 
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Protocol", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Server", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item++, L"Status", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Protocol", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Server", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Status", IL_SUCCESS, 1, 0);
 
 			_r_ctrl_setstring (hwnd, IDC_URLINFO_LINK, _r_obj_getstring (_r_config_getstring (L"UrlInfoLink", APP_HOST)));
 			_r_ctrl_checkbutton (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE));
@@ -2169,14 +2105,14 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_IP_RESULT, 0, L"External address", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_IP_RESULT, 1, L"Local address", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item++, L"Адрес", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item++, L"Прокси", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item++, L"Провайдер", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item++, L"Организация", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item++, L"Город", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item++, L"Координаты", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Адрес", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Прокси", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Провайдер", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Организация", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Город", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Координаты", IL_SUCCESS, 0, 0);
 
 			_r_ctrl_checkbutton (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE));
 
@@ -2217,23 +2153,23 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_SYSINFO, 2, L"Version of protocols", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_SYSINFO, 3, L"System", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Winsock version", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Windows version", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Winsock version", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Windows version", IL_SUCCESS, 0, 0);
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Состояние сети", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Тип узла", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Переадресация", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Proxy", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"DNS", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Состояние сети", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Тип узла", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Переадресация", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Proxy", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"DNS", IL_SUCCESS, 1, 0);
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"IPv4", IL_SUCCESS, 2, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"IPv6", IL_SUCCESS, 2, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"IPv4", IL_SUCCESS, 2, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"IPv6", IL_SUCCESS, 2, 0);
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"User name", IL_SUCCESS, 3, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Host name", IL_SUCCESS, 3, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item++, L"Computer name", IL_SUCCESS, 3, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"User name", IL_SUCCESS, 3, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Host name", IL_SUCCESS, 3, 0);
+			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Computer name", IL_SUCCESS, 3, 0);
 
 			GetSysInfo (hwnd);
 
@@ -2254,41 +2190,41 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_TCP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_TCP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"RTO algorithm", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"The minimum RTO value (ms)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"The maximum RTO value (ms)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Received", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Sent", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Sent (Again)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Sent with the reset flag", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Received errors", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Failed connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Open (active)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Open (passive)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Established connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Discarded connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Max. number of connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Number of connections", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"RTO algorithm", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The minimum RTO value (ms)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The maximum RTO value (ms)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent (Again)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent with the reset flag", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received errors", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Failed connections", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (active)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (passive)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Established connections", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Discarded connections", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Max. number of connections", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Number of connections", IL_SUCCESS, 0, 0);
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"RTO algorithm", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"The minimum RTO value (ms)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"The maximum RTO value (ms)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Received", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Sent", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Sent (Again)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Sent with the reset flag", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Received errors", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Failed connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Open (active)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Open (passive)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Established connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Discarded connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Max. number of connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item++, L"Number of connections", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"RTO algorithm", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The minimum RTO value (ms)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The maximum RTO value (ms)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent (Again)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent with the reset flag", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received errors", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Failed connections", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (active)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (passive)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Established connections", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Discarded connections", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Max. number of connections", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Number of connections", IL_SUCCESS, 1, 0);
 
 			break;
 		}
@@ -2307,21 +2243,21 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_UDP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_UDP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Received", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Received (errors)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Received (invalid port)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Sent", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Number of addresses", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (errors)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (invalid port)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Number of addresses", IL_SUCCESS, 0, 0);
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Received", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Received (errors)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Received (invalid port)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Sent", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item++, L"Number of addresses", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (errors)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (invalid port)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Number of addresses", IL_SUCCESS, 1, 0);
 
 			break;
 		}
@@ -2340,19 +2276,19 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_ICMP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_ICMP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Incoming", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Incoming (errors)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Outgoing", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Outgoing (errors)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming (errors)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing (errors)", IL_SUCCESS, 0, 0);
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Incoming", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Incoming (errors)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Outgoing", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item++, L"Outgoing (errors)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming (errors)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing (errors)", IL_SUCCESS, 1, 0);
 
 			break;
 		}
@@ -2371,59 +2307,59 @@ VOID InitializePage (
 			_r_listview_addgroup (hwnd, IDC_IP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_IP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
 
-			item = 0;
+			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Redirection", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Redirected packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved (errors in header)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved (errors in address)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved (errors in protocol)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Discarded incoming packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Discarded outgoing routes", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Discarded outgoing packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets without a route", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets collected", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets collected (error)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets requiring assembly", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragmented packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragmented packets (error)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragments created", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragmented packet assembly time", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Delivered packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets sent", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"TTL value", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Number of interfaces", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Number of IP addresses", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Number of routes", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirection", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirected packets", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in header)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in address)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in protocol)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded incoming packets", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing routes", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing packets", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets without a route", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected (error)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets requiring assembly", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets (error)", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragments created", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packet assembly time", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Delivered packets", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets sent", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"TTL value", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of interfaces", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of IP addresses", IL_SUCCESS, 0, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of routes", IL_SUCCESS, 0, 0);
 
-			item = 24;
+			item_id = 24;
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Redirection", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Redirected packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved (errors in header)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved (errors in address)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Recieved (errors in protocol)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Discarded incoming packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Discarded outgoing routes", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Discarded outgoing packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets without a route", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets collected", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets collected (error)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets requiring assembly", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragmented packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragmented packets (error)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragments created", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Fragmented packet assembly time", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Delivered packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Packets sent", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"TTL value", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Number of interfaces", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Number of IP addresses", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item++, L"Number of routes", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirection", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirected packets", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in header)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in address)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in protocol)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded incoming packets", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing routes", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing packets", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets without a route", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected (error)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets requiring assembly", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets (error)", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragments created", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packet assembly time", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Delivered packets", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets sent", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"TTL value", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of interfaces", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of IP addresses", IL_SUCCESS, 1, 0);
+			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of routes", IL_SUCCESS, 1, 0);
 
 			break;
 		}
@@ -2471,7 +2407,7 @@ INT_PTR WINAPI PageDlgProc (
 		case WM_DESTROY:
 		{
 			WCHAR buffer[256] = {0};
-			LONG item;
+			LONG item_id;
 			BOOL status = FALSE;
 
 			if (GetDlgItem (hwnd, IDC_PING_HOST))
@@ -2482,18 +2418,18 @@ INT_PTR WINAPI PageDlgProc (
 
 			if (GetDlgItem (hwnd, IDC_PING_RETRIES))
 			{
-				item = GetDlgItemInt (hwnd, IDC_PING_RETRIES, &status, TRUE);
+				item_id = GetDlgItemInt (hwnd, IDC_PING_RETRIES, &status, TRUE);
 
 				if (status)
-					_r_config_setlong (L"PingRetries", item);
+					_r_config_setlong (L"PingRetries", item_id);
 			}
 
 			if (GetDlgItem (hwnd, IDC_SPEEDMETER_LINK))
 			{
-				item = GetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, &status, TRUE);
+				item_id = GetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, &status, TRUE);
 
 				if (status)
-					_r_config_setlong (L"SpeedMeterLimit", item);
+					_r_config_setlong (L"SpeedMeterLimit", item_id);
 
 				GetDlgItemText (hwnd, IDC_SPEEDMETER_LINK, buffer, RTL_NUMBER_OF (buffer));
 				_r_config_setstring (L"SpeedmeterLink", buffer);
@@ -2531,15 +2467,15 @@ INT_PTR WINAPI PageDlgProc (
 
 			if (GetDlgItem (hwnd, IDC_WHOIS_SERVER))
 			{
-				item = (LONG)SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_GETCURSEL, 0, 0);
+				item_id = (LONG)SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_GETCURSEL, 0, 0);
 
-				if (item == CB_ERR)
+				if (item_id == CB_ERR)
 				{
 					GetDlgItemText (hwnd, IDC_WHOIS_SERVER, buffer, RTL_NUMBER_OF (buffer));
 					_r_config_setstring (L"WhoisServerCustom", buffer);
 				}
 
-				_r_config_setlong (L"WhoisServer", item);
+				_r_config_setlong (L"WhoisServer", item_id);
 			}
 
 			break;
@@ -2955,7 +2891,6 @@ LRESULT CALLBACK DlgProc (
 
 				if (page_list[i].hpage)
 					SetPagePos (hwnd, page_list[i].hpage);
-
 			}
 
 			page_id = GetCurrentPage (hwnd);
@@ -3018,7 +2953,8 @@ LRESULT CALLBACK DlgProc (
 				case TVN_SELCHANGING:
 				{
 					LPNMTREEVIEW pnmtv;
-					ULONG_PTR page_id;
+					TVITEMEX tvi = {0};
+					LONG_PTR page_id;
 
 					if (wparam != IDC_ITEMLIST)
 						break;
@@ -3026,6 +2962,17 @@ LRESULT CALLBACK DlgProc (
 					pnmtv = (LPNMTREEVIEW)lparam;
 
 					page_id = pnmtv->itemOld.lParam;
+
+					if (page_id == -1)
+					{
+						tvi.hItem = (HTREEITEM)SendMessage (pnmtv->hdr.hwndFrom, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)pnmtv->itemNew.hItem);
+						tvi.mask = TVIF_HANDLE;
+
+						SendMessage (pnmtv->hdr.hwndFrom, TVM_GETITEM, 0, (LPARAM)&tvi);
+						SendMessage (pnmtv->hdr.hwndFrom, TVM_SELECTITEM, TVGN_CARET, (LPARAM)tvi.hItem);
+
+						break;
+					}
 
 					if (page_list[page_id].hpage)
 						ShowWindow (page_list[page_id].hpage, SW_HIDE);
