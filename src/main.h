@@ -3,20 +3,23 @@
 
 #pragma once
 
+#include "routine.h"
+
+#include "resource.h"
+#include "app.h"
+
 // libs
 #pragma comment(lib, "msimg32.lib")
 #pragma comment(lib, "crypt32.lib")
 #pragma comment(lib, "dnsapi.lib")
-#pragma comment(lib, "fwpuclnt.lib")
 #pragma comment(lib, "iphlpapi.lib")
+#pragma comment(lib, "netapi32.lib")
 #pragma comment(lib, "rpcrt4.lib")
+#pragma comment(lib, "sensapi.lib")
 #pragma comment(lib, "version.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "winmm.lib")
-#pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "wintrust.lib")
-#pragma comment(lib, "netapi32.lib")
-#pragma comment(lib, "sensapi.lib")
 
 #define PING_TIMEOUT 1000
 
@@ -29,6 +32,8 @@
 #define EX_STYLE LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT | LVS_EX_INFOTIP | LVS_EX_LABELTIP
 #define G_STYLE LVGS_COLLAPSIBLE
 
+#define LANG_MENU 3
+
 #define IL_FOLDER 0
 #define IL_FOLDER_CURRENT 1
 #define IL_SUCCESS 2
@@ -40,10 +45,19 @@
 
 #define IP_ADDRESS L"https://api.ipify.org/?format=text"
 
+typedef struct _STATIC_DATA
+{
+	HIMAGELIST himglist;
+	HICON hfolder;
+	HICON hfolder_current;
+	HICON hsuccess;
+	HICON hfailed;
+} STATIC_DATA, *PSTATIC_DATA;
+
 typedef struct _PAGE_LIST
 {
-	WCHAR title[128];
-	WCHAR description[128];
+	INT title;
+	INT description;
 
 	HWND hpage;
 	HTREEITEM hitem;
@@ -58,7 +72,7 @@ typedef struct _PAGE_LIST
 
 typedef struct _CATEGORY_LIST
 {
-	WCHAR name[128];
+	INT name;
 	HTREEITEM hitem;
 } CATEGORY_LIST, *PCATEGORY_LIST;
 

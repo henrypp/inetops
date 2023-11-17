@@ -26,12 +26,58 @@
 
 #define APP_HOST L"www.github.com"
 
-WSADATA wsa = {0};
+STATIC_DATA config = {0};
 PAGE_LIST page_list[PAGE_COUNT] = {0};
 CATEGORY_LIST category_list[3] = {0};
-HIMAGELIST himglist = NULL;
+WSADATA wsa = {0};
 
-LONG_PTR TreeView_CustDraw (
+INT_PTR WINAPI PageDlgProc (
+	_In_ HWND hwnd,
+	_In_ UINT msg,
+	_In_ WPARAM wparam,
+	_In_ LPARAM lparam
+);
+
+VOID _app_imagelist_init (
+	_In_opt_ HWND hwnd,
+	_In_ LONG dpi_value
+)
+{
+	LONG icon_small;
+
+	SAFE_DELETE_ICON (config.hfolder);
+	SAFE_DELETE_ICON (config.hfolder_current);
+	SAFE_DELETE_ICON (config.hsuccess);
+	SAFE_DELETE_ICON (config.hfailed);
+
+	icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
+
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER), icon_small, &config.hfolder);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER_CURRENT), icon_small, &config.hfolder_current);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_SUCCESS), icon_small, &config.hsuccess);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FAULT), icon_small, &config.hfailed);
+
+	if (config.himglist)
+	{
+		ImageList_SetIconSize (config.himglist, icon_small, icon_small);
+	}
+	else
+	{
+		config.himglist = ImageList_Create (icon_small, icon_small, ILC_COLOR32 | ILC_HIGHQUALITYSCALE, 0, 5);
+
+		if (config.himglist)
+		{
+			ImageList_ReplaceIcon (config.himglist, -1, config.hfolder);
+			ImageList_ReplaceIcon (config.himglist, -1, config.hfolder_current);
+			ImageList_ReplaceIcon (config.himglist, -1, config.hsuccess);
+			ImageList_ReplaceIcon (config.himglist, -1, config.hfailed);
+		}
+	}
+
+	_r_treeview_setimagelist (hwnd, IDC_ITEMLIST, config.himglist);
+}
+
+LONG_PTR _app_treeview_custdraw (
 	_In_ HWND hwnd,
 	_In_ LPNMTVCUSTOMDRAW lptvcd
 )
@@ -48,40 +94,40 @@ LONG_PTR TreeView_CustDraw (
 
 		case CDDS_ITEMPREPAINT:
 		{
-			HFONT hFont;
-			COLORREF clTextClr;
-			ULONG dwWeight = 0;
-			ULONG dwUnderline = 0;
+			HFONT hfont;
+			COLORREF text_clr;
+			ULONG weight = 0;
+			ULONG underline = 0;
 
-			clTextClr = GetSysColor (COLOR_GRAYTEXT);
+			text_clr = GetSysColor (COLOR_GRAYTEXT);
 
 			if (!lptvcd->iLevel)
 			{
-				dwWeight = FW_BOLD;
-				clTextClr = RGB (0, 0, 0);
+				weight = FW_BOLD;
+				text_clr = RGB (0, 0, 0);
 			}
 
 			if (lptvcd->nmcd.uItemState & CDIS_HOT)
 			{
-				clTextClr = RGB (0, 78, 152);
-				dwUnderline = 1;
+				text_clr = RGB (0, 78, 152);
+				underline = 1;
 				lptvcd->clrTextBk = RGB (216, 231, 239);
 			}
 
 			if (lptvcd->nmcd.uItemState & CDIS_SELECTED)
 			{
-				clTextClr = RGB (0, 0, 0);
+				text_clr = RGB (0, 0, 0);
 				lptvcd->clrTextBk = RGB (171, 208, 228);
 			}
 
-			hFont = CreateFont (
+			hfont = CreateFontW (
 				-11,
 				0,
 				0,
 				0,
-				dwWeight,
+				weight,
 				0,
-				dwUnderline,
+				underline,
 				0,
 				DEFAULT_CHARSET,
 				OUT_CHARACTER_PRECIS,
@@ -91,10 +137,11 @@ LONG_PTR TreeView_CustDraw (
 				0
 			);
 
-			SelectObject (lptvcd->nmcd.hdc, hFont);
-			DeleteObject (hFont);
+			SelectObject (lptvcd->nmcd.hdc, hfont);
 
-			lptvcd->clrText = clTextClr;
+			DeleteObject (hfont);
+
+			lptvcd->clrText = text_clr;
 
 			return (CDRF_NOTIFYPOSTPAINT | CDRF_NEWFONT);
 		}
@@ -103,7 +150,7 @@ LONG_PTR TreeView_CustDraw (
 	return 0;
 }
 
-VOID SetPagePos (
+VOID _app_setpagepos (
 	_In_ HWND hwnd,
 	_In_ HWND hchild
 )
@@ -121,34 +168,7 @@ VOID SetPagePos (
 	SetWindowPos (hchild, NULL, _r_calc_rectwidth (&rect) + rect.left * 2, pos, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
 }
 
-VOID Lv_InsertItemA (
-	_In_ HWND hwnd,
-	_In_ INT ctrl_id,
-	_In_ LPSTR text,
-	_In_ INT item_id,
-	_In_ INT subitem_id
-)
-{
-	PR_STRING string;
-	R_BYTEREF st;
-	NTSTATUS status;
-
-	_r_obj_initializebyteref (&st, text);
-
-	st.buffer = (LPSTR)text;
-	st.length = strlen (text);
-
-	status = _r_str_multibyte2unicode (&st, &string);
-
-	if (NT_SUCCESS (status))
-	{
-		_r_listview_setitem (hwnd, ctrl_id, item_id, subitem_id, string->buffer);
-
-		_r_obj_dereference (string);
-	}
-}
-
-ULONG_PTR GetPageId (
+ULONG_PTR _app_getpageid (
 	_In_ INT dlg_id
 )
 {
@@ -161,7 +181,7 @@ ULONG_PTR GetPageId (
 	return 0;
 }
 
-ULONG_PTR GetCurrentPage (
+ULONG_PTR _app_getcurrentpage (
 	_In_ HWND hwnd
 )
 {
@@ -187,7 +207,7 @@ ULONG_PTR GetCurrentPage (
 	return lparam;
 }
 
-VOID SetCurrentPage (
+VOID _app_setcurrentpage (
 	_In_ HWND hwnd,
 	_In_ ULONG_PTR item_id
 )
@@ -198,36 +218,37 @@ VOID SetCurrentPage (
 	SendDlgItemMessage (hwnd, IDC_ITEMLIST, TVM_SELECTITEM, TVGN_CARET, (LPARAM)page_list[item_id].hitem);
 }
 
-NTSTATUS GetPing (
+NTSTATUS _app_tool_ping (
 	_In_ LPVOID lparam
 )
 {
-	WCHAR buffer[256];
-	WCHAR ipaddr[32];
-	CHAR send_buff[256];
+	SOCKADDR_IN6_LH icmp6_local_addr = {0};
+	SOCKADDR_IN6_LH icmp6_remote_addr = {0};
+	IP_OPTION_INFORMATION icmp_options = {0};
+	PICMP_ECHO_REPLY reply = NULL;
+	IPAddr icmp_local_addr = 0;
+	IPAddr icmp_remote_addr = 0;
+	ADDRINFOW hints = {0};
 	R_STRINGREF sr;
+	WCHAR buffer[32];
+	WCHAR ipaddr[32];
 	PR_STRING string;
 	PR_BYTE bytes;
+	PR_BYTE icmp_echo;
 	PADDRINFOW result;
-	ADDRINFOW hints;
 	LPSOCKADDR sockaddr_ip;
-	SOCKADDR_IN6_LH v6addr;
-	PICMP_ECHO_REPLY icmp_reply;
 	HWND hwnd;
-	HANDLE icmp_handle = NULL;
-	HANDLE icmp6_handle = NULL;
+	HANDLE icmp_handle;
 	ULONG_PTR page_id;
-	PVOID reply;
-	ULONG byte_length;
+	ULONG reply_length;
 	ULONG length;
-	ULONG ip;
-	ULONG status;
 	LONG retries;
 	INT item_id = 0;
+	NTSTATUS status;
 
 	hwnd = (HWND)lparam;
 
-	page_id = GetPageId (IDD_PAGE_PING);
+	page_id = _app_getpageid (IDD_PAGE_PING);
 
 	page_list[page_id].thread = TRUE;
 
@@ -235,8 +256,6 @@ NTSTATUS GetPing (
 	_r_ctrl_enable (hwnd, IDC_PING_CLEAR, FALSE);
 
 	_r_listview_deleteallitems (hwnd, IDC_PING_RESULT);
-
-	RtlZeroMemory (&hints, sizeof (hints));
 
 	_r_ctrl_enable (hwnd, IDC_HOSTADDR_START, FALSE);
 	_r_ctrl_enable (hwnd, IDC_HOSTADDR_CLEAR, FALSE);
@@ -250,21 +269,22 @@ NTSTATUS GetPing (
 	if (!string)
 		goto CleanupExit;
 
-	icmp_handle = IcmpCreateFile ();
-	icmp6_handle = Icmp6CreateFile ();
-
-	if (icmp_handle == INVALID_HANDLE_VALUE || icmp6_handle == INVALID_HANDLE_VALUE)
-		goto CleanupExit;
-
 	retries = _r_ctrl_getinteger (hwnd, IDC_PING_RETRIES, NULL);
 
-	RtlZeroMemory (send_buff, sizeof (send_buff));
+	_r_str_generaterandom (buffer, RTL_NUMBER_OF (buffer), TRUE);
 
-	byte_length = sizeof (ICMP_ECHO_REPLY) + sizeof (send_buff);
-	reply = _r_mem_allocate (byte_length);
+	_r_obj_initializestringref (&sr, buffer);
 
-	for (ULONG_PTR i = 0; i < sizeof (send_buff); i++)
-		send_buff[i] = 'A' + (_r_math_getrandom () % 26);
+	status = _r_str_unicode2multibyte (&sr, &icmp_echo);
+
+	if (!NT_SUCCESS (status))
+		goto CleanupExit;
+
+	icmp_options.Ttl = UCHAR_MAX;
+	icmp_options.Flags = IP_FLAG_DF;
+
+	reply_length = (ULONG)sizeof (ICMP_ECHO_REPLY) + (ULONG)icmp_echo->length + 8 + (ULONG)sizeof (IO_STATUS_BLOCK) + MAX_OPT_SIZE;
+	reply = _r_mem_allocate (reply_length);
 
 	for (LONG i = 0; i < retries; i++)
 	{
@@ -285,38 +305,49 @@ NTSTATUS GetPing (
 				{
 					_r_obj_initializestringref (&sr, ipaddr);
 
-					_r_str_unicode2multibyte (&sr, &bytes);
+					status = _r_str_unicode2multibyte (&sr, &bytes);
+
+					if (!NT_SUCCESS (status))
+						goto CleanupExit;
 
 					if (ptr->ai_family == AF_INET)
 					{
-						ip = inet_addr (bytes->buffer);
+						icmp_handle = IcmpCreateFile ();
 
-						status = IcmpSendEcho (
+						if (icmp_handle == INVALID_HANDLE_VALUE)
+							goto CleanupExit;
+
+						icmp_local_addr = in4addr_any.s_addr;
+						icmp_remote_addr = inet_addr (bytes->buffer);
+
+						status = IcmpSendEcho2Ex (
 							icmp_handle,
-							ip,
-							send_buff,
-							sizeof (send_buff),
 							NULL,
+							NULL,
+							NULL,
+							icmp_local_addr,
+							icmp_remote_addr,
+							icmp_echo->buffer,
+							(WORD)icmp_echo->length,
+							&icmp_options,
 							reply,
-							byte_length,
+							reply_length,
 							PING_TIMEOUT
 						);
 
-						icmp_reply = reply;
-
-						switch (icmp_reply->Status)
+						switch (reply->Status)
 						{
 							case IP_SUCCESS:
 							{
 								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
 
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", icmp_reply->DataSize);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", reply->DataSize);
 								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer);
 
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->Options.Tos);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->Options.Tos);
 								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer);
 
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->Options.Ttl);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->Options.Ttl);
 								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer);
 
 								break;
@@ -324,61 +355,67 @@ NTSTATUS GetPing (
 
 							case IP_REQ_TIMED_OUT:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, L"Timeout", IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, L"Timeout");
+
 								break;
 							}
 
 							default:
 							{
-
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", icmp_reply->Status);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", reply->Status);
 								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_GROUPIDNONE, 0);
 
 								break;
 							}
 						}
+
+						IcmpCloseHandle (icmp_handle);
 
 						item_id += 1;
 					}
 					else if (ptr->ai_family == AF_INET6)
 					{
-						RtlZeroMemory (&v6addr, sizeof (v6addr));
+						icmp_handle = Icmp6CreateFile ();
 
-						status = inet_pton (AF_INET6, bytes->buffer, &v6addr);
+						if (icmp_handle == INVALID_HANDLE_VALUE)
+							goto CleanupExit;
 
-						RDBG2 (L"err: %d", status);
+						status = inet_pton (AF_INET6, bytes->buffer, &icmp6_remote_addr);
+
+						icmp6_local_addr.sin6_addr = in6addr_any;
+						icmp6_local_addr.sin6_family = AF_INET6;
+
+						RtlCopyMemory (&icmp6_remote_addr, &icmp6_remote_addr, sizeof (SOCKADDR_IN6_LH));
 
 						status = Icmp6SendEcho2 (
-							icmp6_handle,
+							icmp_handle,
 							NULL,
 							NULL,
 							NULL,
-							&v6addr,
-							&v6addr,
-							send_buff,
-							sizeof (send_buff),
-							NULL,
+							&icmp6_local_addr,
+							&icmp6_remote_addr,
+							icmp_echo->buffer,
+							(WORD)icmp_echo->length,
+							&icmp_options,
 							reply,
-							byte_length,
+							reply_length,
 							PING_TIMEOUT
 						);
 
-						icmp_reply = reply;
-
-						switch (icmp_reply->Status)
+						switch (reply->Status)
 						{
 							case IP_SUCCESS:
 							{
-								//_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", icmp_reply->DataSize);
 								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
 
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", icmp_reply->DataSize);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", reply->DataSize);
 								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer);
 
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->RoundTripTime);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->RoundTripTime);
 								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer);
 
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", icmp_reply->Options.Ttl);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->Options.Ttl);
 								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer);
 
 								break;
@@ -386,19 +423,22 @@ NTSTATUS GetPing (
 
 							case IP_REQ_TIMED_OUT:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, L"Timeout", IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, L"Timeout");
+
 								break;
 							}
 
 							default:
 							{
-
-								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", icmp_reply->Status);
+								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", reply->Status);
 								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_GROUPIDNONE, 0);
 
 								break;
 							}
 						}
+
+						IcmpCloseHandle (icmp_handle);
 
 						item_id += 1;
 					}
@@ -407,20 +447,15 @@ NTSTATUS GetPing (
 		}
 	}
 
-	_r_mem_free (reply);
-
 CleanupExit:
 
 	page_list[page_id].thread = FALSE;
 
-	if (_r_fs_isvalidhandle (icmp_handle))
-		IcmpCloseHandle (icmp_handle);
-
-	if (_r_fs_isvalidhandle (icmp6_handle))
-		IcmpCloseHandle (icmp6_handle);
-
 	if (string)
 		_r_obj_dereference (string);
+
+	if (reply)
+		_r_mem_free (reply);
 
 	_r_ctrl_setstring (hwnd, IDC_PING_START, L"Start");
 
@@ -430,19 +465,19 @@ CleanupExit:
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS GetExternalIp (
+NTSTATUS _app_tool_externalip (
 	_In_ LPVOID lparam
 )
 {
-	HWND hwnd;
+	CHAR buffer2[4096] = {0};
+	CHAR buffer[256];
+	PR_STRING proxy_string;
+	PR_STRING address;
 	HINTERNET hsession;
 	HINTERNET hconnect;
 	HINTERNET hrequest;
-	CHAR buffer2[4096] = {0};
-	CHAR buffer[256];
-	PR_STRING address;
+	HWND hwnd;
 	ULONG readed;
-	ULONG status;
 	INT item_id = 0;
 	BOOLEAN result = FALSE;
 
@@ -459,26 +494,33 @@ NTSTATUS GetExternalIp (
 
 	address = _r_obj_createstring (IP_ADDRESS);
 
-	status = _r_inet_openurl (hsession, address, &hconnect, &hrequest, NULL);
+	proxy_string = _r_app_getproxyconfiguration ();
 
-	if (_r_inet_querystatuscode (hrequest) == HTTP_STATUS_OK)
+	if (_r_inet_openurl (hsession, address, proxy_string, &hconnect, &hrequest, NULL))
 	{
-		while (TRUE)
+		if (_r_inet_querystatuscode (hrequest) == HTTP_STATUS_OK)
 		{
-			RtlZeroMemory (buffer, sizeof (buffer));
-
-			if (_r_inet_readrequest (hrequest, buffer, RTL_NUMBER_OF (buffer), &readed, NULL))
+			while (TRUE)
 			{
-				buffer[readed] = ANSI_NULL;
+				RtlZeroMemory (buffer, sizeof (buffer));
 
-				StringCchCatA (buffer2, RTL_NUMBER_OF (buffer2), buffer);
+				if (_r_inet_readrequest (hrequest, buffer, RTL_NUMBER_OF (buffer), &readed, NULL))
+				{
+					buffer[readed] = ANSI_NULL;
+
+					StringCchCatA (buffer2, RTL_NUMBER_OF (buffer2), buffer);
+				}
+				else
+				{
+					break;
+				}
+
+				if (_r_str_isempty2 (buffer))
+					break;
 			}
 
-			if (!readed)
-				break;
+			result = TRUE;
 		}
-
-		result = TRUE;
 	}
 
 	if (!result)
@@ -486,28 +528,33 @@ NTSTATUS GetExternalIp (
 
 	_r_ctrl_enable (hwnd, IDC_IP_REFRESH, TRUE);
 
+	if (proxy_string)
+		_r_obj_dereference (proxy_string);
+
+	_r_obj_dereference (address);
+
 	_r_inet_close (hsession);
 	_r_inet_close (hconnect);
 	_r_inet_close (hrequest);
 
-	_r_obj_dereference (address);
-
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS GetDownloadSpeed (
+NTSTATUS _app_tool_downloadspeed (
 	_In_ LPVOID lparam
 )
 {
-	HWND hwnd;
 	HINTERNET hsession = NULL;
 	HINTERNET hconnect = NULL;
 	HINTERNET hrequest = NULL;
+	HWND hwnd;
+	PR_STRING proxy_string = NULL;
 	PR_STRING url;
 	SYSTEMTIME st = {0};
 	WCHAR buffer[256] = {0};
-	BYTE buff[0x8000] = {0};
+	PBYTE buff = NULL;
 	ULONG_PTR page_id;
+	ULONG length;
 	ULONG total_size = 0;
 	ULONG recieved = 0;
 	ULONG temp = 0;
@@ -518,12 +565,12 @@ NTSTATUS GetDownloadSpeed (
 	LARGE_INTEGER p2 = {0};
 	LARGE_INTEGER freq = {0};
 	ULONG limit;
-	INT item_id;
 	ULONG status;
 
 	hwnd = (HWND)lparam;
+
 	limit = _r_ctrl_getinteger (hwnd, IDC_SPEEDMETER_LIMIT, NULL);
-	page_id = GetPageId (IDD_PAGE_SPEEDMETER);
+	page_id = _app_getpageid (IDD_PAGE_SPEEDMETER);
 
 	_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_START, L"Прервать");
 	_r_ctrl_enable (hwnd, IDC_SPEEDMETER_CLEAR, FALSE);
@@ -533,26 +580,31 @@ NTSTATUS GetDownloadSpeed (
 	url = _r_ctrl_getstring (hwnd, IDC_SPEEDMETER_LINK);
 
 	if (!url)
-		goto END;
+		goto CleanupExit;
 
 	hsession = _r_inet_createsession (NULL);
 
 	if (!hsession)
-		goto END;
+		goto CleanupExit;
 
-	status = _r_inet_openurl (hsession, url, &hconnect, &hrequest, NULL);
+	proxy_string = _r_app_getproxyconfiguration ();
+
+	status = _r_inet_openurl (hsession, url, proxy_string, &hconnect, &hrequest, NULL);
 
 	if (status == ERROR_SUCCESS)
 	{
 		RtlQueryPerformanceCounter (&p1);
 		RtlQueryPerformanceCounter (&freq);
 
+		length = 0x8000;
+		buff = _r_mem_allocate (length);
+
 		while (TRUE)
 		{
 			if (!page_list[page_id].thread)
 				break;
 
-			if (_r_inet_readrequest (hrequest, buff, sizeof (buff), &recieved, &total_size))
+			if (_r_inet_readrequest (hrequest, buff, length, &recieved, &total_size))
 			{
 				RtlQueryPerformanceCounter (&p2);
 
@@ -568,8 +620,6 @@ NTSTATUS GetDownloadSpeed (
 					if (temp > max_speed)
 						max_speed = temp;
 				}
-
-				item_id = 0;
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d kbps", min_speed);
 				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 0, 1, buffer);
@@ -594,17 +644,19 @@ NTSTATUS GetDownloadSpeed (
 				break;
 		}
 
+		_r_mem_free (buff);
+
 		GetLocalTime (&st);
 
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
-		_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, 6, buffer);
+		_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 6, 2, buffer);
 	}
 	else
 	{
 		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Can't access url.");
 	}
 
-END:
+CleanupExit:
 
 	if (hsession)
 		_r_inet_close (hsession);
@@ -614,6 +666,9 @@ END:
 
 	if (hrequest)
 		_r_inet_close (hrequest);
+
+	if (proxy_string)
+		_r_obj_dereference (proxy_string);
 
 	if (url)
 		_r_obj_dereference (url);
@@ -628,18 +683,26 @@ END:
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS GetWhois (
+NTSTATUS _app_tool_whois (
 	_In_ LPVOID lparam
 )
 {
 	HWND hwnd;
 	SOCKET sock = 0;
+	SOCKADDR_IN addr = {0};
+	PHOSTENT host;
+	WSABUF wsa_buffer = {0};
 	WCHAR buffer[256] = {0};
-	CHAR buffer2[256] = {0};
 	CHAR domain[256] = {0};
 	CHAR server[256] = {0};
+	PBYTE bytes;
 	R_STRINGBUILDER str;
-	R_STRINGREF substring;
+	R_BYTEREF br;
+	PR_STRING string;
+	ULONG return_length = 0;
+	ULONG buffer_sent = 0;
+	ULONG flags = 0;
+	NTSTATUS status;
 
 	hwnd = (HWND)lparam;
 
@@ -653,62 +716,95 @@ NTSTATUS GetWhois (
 	if (!GetDlgItemTextA (hwnd, IDC_WHOIS_HOST, domain, RTL_NUMBER_OF (domain)) || !GetDlgItemTextA (hwnd, IDC_WHOIS_SERVER, server, RTL_NUMBER_OF (server)))
 	{
 		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, L"Необходимо ввести адрес домена и сервер");
-		goto WHOIS_RETN;
+
+		goto CleanupExit;
 	}
 
-	//ddr.sin_family = AF_INET;
-	//ddr.sin_port = htons (43);
-	//ddr.sin_addr.s_addr = inet_addr (server);
-	//
-	//f (addr.sin_addr.S_un.S_addr == INADDR_NONE)
-	//
-	//	host = gethostbyname (server);
-	//
-	//	if (!host)
-	//	{
-	//		_r_str_printf (buffer, RTL_NUMBER_OF(buffer),, L"Ошибка выполнения gethostbyname() (код ошибки %d)", PebLastError ());
-	//		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
-	//
-	//		goto WHOIS_RETN;
-	//	}
-	//
-	//	addr.sin_addr.S_un.S_addr = ((LPIN_ADDR)host->h_addr)->s_addr;
-	//
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons (43);
+	addr.sin_addr.s_addr = inet_addr (server);
 
-	sock = socket (AF_INET, SOCK_STREAM, 0);
+	if (addr.sin_addr.S_un.S_addr == INADDR_NONE)
+	{
+		host = gethostbyname (server);
+
+		if (!host)
+		{
+			_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling gethostbyname() error: %d\0", WSAGetLastError ());
+			_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
+
+			goto CleanupExit;
+		}
+
+		addr.sin_addr.S_un.S_addr = ((LPIN_ADDR)host->h_addr)->s_addr;
+	}
+
+	sock = WSASocket (AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
 
 	if (sock == INVALID_SOCKET)
 	{
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Ошибка выполнения socket() (код ошибки %d)", PebLastError ());
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling socket() error: %d", PebLastError ());
 		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
 
-		goto WHOIS_RETN;
+		goto CleanupExit;
 	}
 
-	//if (connect (sock, &addr, sizeof (sockaddr)) == SOCKET_ERROR)
-	//{
-	//	_r_str_printf (buffer, RTL_NUMBER_OF(buffer), L"Ошибка выполнения connect() (код ошибки %i)", PebLastError ());
-	//	_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
-	//
-	//	goto WHOIS_RETN;
-	//}
+	if (WSAConnect (sock, (PSOCKADDR)&addr, sizeof (SOCKADDR_IN), NULL, NULL, NULL, NULL) == SOCKET_ERROR)
+	{
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling WSAConnect() error: %d", PebLastError ());
+		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
+
+		goto CleanupExit;
+	}
 
 	StringCchCatA (domain, RTL_NUMBER_OF (domain), "\r\n");
-	//WSASend (sock, domain, (INT)strlen (domain), 0);
+
+	wsa_buffer.buf = domain;
+	wsa_buffer.len = (ULONG)strlen (domain);
+
+	status = WSASend (sock, &wsa_buffer, 1, &buffer_sent, 1, NULL, NULL);
+
+	if (status == SOCKET_ERROR)
+	{
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling WSASend() error: %d", PebLastError ());
+		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
+
+		goto CleanupExit;
+	}
+
+	bytes = _r_mem_allocate (0x1000);
 
 	while (TRUE)
 	{
-		memset (&buffer2, 0, sizeof (buffer2));
+		wsa_buffer.buf = bytes;
+		wsa_buffer.len = 0x1000;
 
-		if (!recv (sock, buffer2, sizeof (buffer2), 0))
+		status = WSARecv (sock, &wsa_buffer, 1, &return_length, &flags, NULL, NULL);
+
+		if (status != SOCKET_ERROR || return_length == 0)
 			break;
 
-		_r_obj_appendstringbuilder (&str, buffer); // buffer2 
+		_r_obj_initializebyteref (&br, bytes);
+
+		status = _r_str_multibyte2unicode (&br, &string);
+
+		if (NT_SUCCESS (status))
+		{
+			_r_obj_appendstringbuilder2 (&str, string);
+
+			_r_obj_dereference (string);
+		}
 	}
 
-	_r_obj_initializestringref (&substring, (LPWSTR)L"\n");
+	string = _r_obj_finalstringbuilder (&str);
 
-WHOIS_RETN:
+	_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, string->buffer);
+
+	_r_obj_dereference (string);
+
+	_r_mem_free (bytes);
+
+CleanupExit:
 
 	if (sock)
 		closesocket (sock);
@@ -719,50 +815,41 @@ WHOIS_RETN:
 	return STATUS_SUCCESS;
 }
 
-VOID UrlDecoder (
+VOID _app_tool_urldecoder (
 	_In_ HWND hwnd
 )
 {
 	PR_STRING string;
 	WCHAR buffer[256];
 	ULONG size;
+	HRESULT status;
 
 	_r_ctrl_setstring (hwnd, IDC_URLDECODER_RESULT, L"");
-
-	_r_ctrl_enable (hwnd, IDC_URLDECODER_START, FALSE);
-	_r_ctrl_enable (hwnd, IDC_URLDECODER_CLEAR, FALSE);
 
 	string = _r_ctrl_getstring (hwnd, IDC_URLDECODER_LINK);
 
 	if (!string)
-		return;
+		goto CleanupExit;
+
+	_r_ctrl_enable (hwnd, IDC_URLDECODER_START, FALSE);
+	_r_ctrl_enable (hwnd, IDC_URLDECODER_CLEAR, FALSE);
 
 	size = RTL_NUMBER_OF (buffer);
 
-	if (UrlUnescape (string->buffer, buffer, &size, URL_ESCAPE_PERCENT) != S_OK)
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Can't escape address (0x%08X)", PebLastError ());
+	status = UrlUnescapeW (string->buffer, buffer, &size, URL_ESCAPE_PERCENT);
+
+	if (FAILED (status))
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Can't escape address (0x%08X)", status);
 
 	_r_ctrl_setstring (hwnd, IDC_URLDECODER_RESULT, buffer);
+
+CleanupExit:
 
 	_r_ctrl_enable (hwnd, IDC_URLDECODER_START, TRUE);
 	_r_ctrl_enable (hwnd, IDC_URLDECODER_CLEAR, TRUE);
 }
 
-VOID GetIpAddress (
-	_In_ HWND hwnd
-)
-{
-	if (_r_ctrl_isbuttonchecked (hwnd, IDC_IP_EXTERNAL_CHK))
-	{
-		_r_sys_createthread (&GetExternalIp, hwnd, NULL, NULL, L"ExternalIp");
-	}
-	else
-	{
-		_r_listview_fillitems (hwnd, IDC_IP_RESULT, -1, -1, 1, L"n/a", IL_FAULT);
-	}
-}
-
-VOID GetSharedType (
+VOID _app_getsharedtype (
 	_Out_writes_z_ (buffer_size) LPWSTR buffer,
 	_In_ _In_range_ (1, PR_SIZE_MAX_STRING_LENGTH) ULONG_PTR buffer_size,
 	_In_ ULONG type
@@ -794,11 +881,10 @@ VOID GetSharedType (
 		_r_str_printf (buffer, buffer_size, SZ_HEX, type);
 }
 
-VOID GetSharedInfo (
+VOID _app_tool_sharedinfo (
 	_In_ HWND hwnd
 )
 {
-	NET_API_STATUS status;
 	WCHAR buffer[256];
 	PSHARE_INFO_502 share_info = NULL;
 	PSHARE_INFO_502 p;
@@ -806,6 +892,7 @@ VOID GetSharedInfo (
 	ULONG resume_handle = 0;
 	ULONG total;
 	INT item_id = 0;
+	NET_API_STATUS status;
 
 	_r_listview_deleteallitems (hwnd, IDC_SHAREDINFO);
 
@@ -830,7 +917,7 @@ VOID GetSharedInfo (
 				_r_listview_additem_ex (hwnd, IDC_SHAREDINFO, item_id, p->shi502_netname, IL_SUCCESS, I_GROUPIDNONE, 0);
 				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 1, p->shi502_path[0] ? p->shi502_path : SZ_UNKNOWN);
 
-				GetSharedType (buffer, RTL_NUMBER_OF (buffer), p->shi502_type);
+				_app_getsharedtype (buffer, RTL_NUMBER_OF (buffer), p->shi502_type);
 				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 2, buffer);
 
 				if (p->shi502_max_uses == -1)
@@ -850,20 +937,23 @@ VOID GetSharedInfo (
 	while (status == ERROR_MORE_DATA);
 }
 
-VOID GetSysInfo (
+VOID _app_tool_sysinfo (
 	_In_ HWND hwnd
 )
 {
 	RTL_OSVERSIONINFOEXW version_info;
+	R_STRINGREF sr;
+	R_BYTEREF br;
 	PFIXED_INFO network_params;
+	PR_STRING username;
 	WCHAR buffer[128];
-	WCHAR buffer2[256];
-	CHAR szBufferA[16];
-	NTSTATUS status;
+	WCHAR type[256] = {0};
+	CHAR bytes[32];
 	ULONG out_length;
-	ULONG flags;
+	ULONG flags = 0;
 	SOCKET sock;
 	INT item_id = 0;
+	NTSTATUS status;
 
 	_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d.%d", LOBYTE (wsa.wVersion), HIBYTE (wsa.wVersion));
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
@@ -884,28 +974,21 @@ VOID GetSysInfo (
 		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 	}
 
-	flags = 0;
-
 	if (IsNetworkAlive (&flags))
 	{
-		ZeroMemory (buffer2, sizeof (buffer2));
-
 		if (flags & NETWORK_ALIVE_LAN)
-			_r_str_append (buffer2, RTL_NUMBER_OF (buffer2), L"LAN");
+			_r_str_append (type, RTL_NUMBER_OF (type), L"LAN, ");
 
 		if (flags & NETWORK_ALIVE_WAN)
-		{
-			if (flags & NETWORK_ALIVE_LAN)
-				_r_str_append (buffer2, RTL_NUMBER_OF (buffer2), L" + ");
+			_r_str_append (type, RTL_NUMBER_OF (type), L"WAN, ");
 
-			_r_str_append (buffer2, RTL_NUMBER_OF (buffer2), L"WAN");
-		}
+		_r_str_trim (type, L", ");
 
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Enabled (%s)", buffer2);
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Enabled (%s)", type);
 	}
 	else
 	{
-		_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"Disabled");
+		_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"No connection");
 	}
 
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
@@ -914,12 +997,9 @@ VOID GetSysInfo (
 	network_params = _r_mem_allocate (out_length);
 
 	if (GetNetworkParams (network_params, &out_length) == ERROR_BUFFER_OVERFLOW)
-	{
-		_r_mem_free (network_params);
-		network_params = _r_mem_allocate (out_length);
-	}
+		_r_mem_reallocate (&network_params, out_length);
 
-	if (GetNetworkParams (network_params, &out_length) == NO_ERROR && network_params)
+	if (GetNetworkParams (network_params, &out_length) == NO_ERROR)
 	{
 		switch (network_params->NodeType)
 		{
@@ -949,7 +1029,7 @@ VOID GetSysInfo (
 
 			default:
 			{
-				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Unknown (0x%08x)", network_params->NodeType);
+				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Unknown (%d)", network_params->NodeType);
 				break;
 			}
 		}
@@ -970,25 +1050,52 @@ VOID GetSysInfo (
 		_r_mem_free (network_params);
 
 	sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); // IPv4
+
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
 	closesocket (sock);
 
 	sock = socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP); // IPv6
+
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
 	closesocket (sock);
 
-	flags = RTL_NUMBER_OF (buffer);
-	GetUserName (buffer, &flags);
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+	_r_obj_initializestringref (&sr, L"%USERNAME%");
 
-	Lv_InsertItemA (hwnd, IDC_SYSINFO, gethostname (szBufferA, RTL_NUMBER_OF (szBufferA)) ? "n/a" : szBufferA, item_id++, 1);
+	status = _r_str_environmentexpandstring (&sr, &username);
+
+	if (NT_SUCCESS (status))
+	{
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, username->buffer);
+
+		_r_obj_dereference (username);
+	}
+	else
+	{
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error (0x%08x)", status);
+
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+	}
+
+	gethostname (bytes, RTL_NUMBER_OF (bytes));
+
+	_r_obj_initializebyteref (&br, bytes);
+
+	status = _r_str_multibyte2unicode (&br, &username);
+
+	if (NT_SUCCESS (status))
+	{
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, username->buffer);
+
+		_r_obj_dereference (username);
+	}
 
 	flags = RTL_NUMBER_OF (buffer);
 	GetComputerNameEx (ComputerNameDnsHostname, buffer, &flags);
+
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 }
 
-VOID GetHostAddress (
+VOID _app_tool_hostaddress (
 	_In_ HWND hwnd
 )
 {
@@ -1003,9 +1110,6 @@ VOID GetHostAddress (
 
 	_r_listview_deleteallitems (hwnd, IDC_HOSTADDR_RESULT);
 
-	_r_ctrl_enable (hwnd, IDC_HOSTADDR_START, FALSE);
-	_r_ctrl_enable (hwnd, IDC_HOSTADDR_CLEAR, FALSE);
-
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
@@ -1014,6 +1118,9 @@ VOID GetHostAddress (
 
 	if (!url)
 		return;
+
+	_r_ctrl_enable (hwnd, IDC_HOSTADDR_START, FALSE);
+	_r_ctrl_enable (hwnd, IDC_HOSTADDR_CLEAR, FALSE);
 
 	if (GetAddrInfoW (url->buffer, NULL, &hints, &result) == ERROR_SUCCESS)
 	{
@@ -1057,29 +1164,29 @@ VOID GetHostAddress (
 	_r_ctrl_enable (hwnd, IDC_HOSTADDR_CLEAR, TRUE);
 }
 
-NTSTATUS GetUrlInfo (
+NTSTATUS _app_tool_urlinfo (
 	_In_ LPVOID lparam
 )
 {
-	HWND hwnd;
+	PR_STRING proxy_string;
+	PR_STRING string;
+	PR_STRING url;
+	SYSTEMTIME st = {0};
 	HINTERNET hsession;
 	HINTERNET hconnect;
 	HINTERNET hrequest;
-	PR_STRING url;
-	PR_STRING string;
-	SYSTEMTIME st = {0};
+	HWND hwnd;
 	WCHAR buffer[256] = {0};
 	LONG64 timestamp;
 	ULONG flags = 0;
 	ULONG length;
 	ULONG status;
 	INT item_id = 0;
+	BOOL result;
 
 	hwnd = (HWND)lparam;
 
 	_r_ctrl_setstring (hwnd, IDC_URLINFO_HEADER, NULL);
-
-	_r_ctrl_enable (hwnd, IDC_URLINFO_START, FALSE);
 
 	url = _r_ctrl_getstring (hwnd, IDC_URLINFO_LINK);
 
@@ -1088,7 +1195,12 @@ NTSTATUS GetUrlInfo (
 	if (!hsession)
 		return 0;
 
-	status = _r_inet_openurl (hsession, url, &hconnect, &hrequest, NULL);
+	_r_ctrl_enable (hwnd, IDC_URLINFO_START, FALSE);
+	_r_ctrl_enable (hwnd, IDC_URLINFO_CLEAR, FALSE);
+
+	proxy_string = _r_app_getproxyconfiguration ();
+
+	status = _r_inet_openurl (hsession, url, proxy_string, &hconnect, &hrequest, NULL);
 
 	if (status != ERROR_SUCCESS)
 	{
@@ -1119,7 +1231,7 @@ NTSTATUS GetUrlInfo (
 
 	timestamp = _r_inet_querylastmodified (hrequest);
 
-	string = _r_format_unixtime (timestamp);
+	string = _r_format_unixtime (timestamp, 0);
 
 	if (timestamp && string)
 	{
@@ -1131,9 +1243,9 @@ NTSTATUS GetUrlInfo (
 	}
 
 	length = sizeof (buffer);
-	BOOL wu = WinHttpQueryOption (hrequest, WINHTTP_QUERY_ACCEPT_RANGES, &buffer, &length);
+	result = WinHttpQueryOption (hrequest, WINHTTP_QUERY_ACCEPT_RANGES, &buffer, &length);
 
-	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, wu ? L"Supported" : L"Unsupported");
+	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, result ? L"Supported" : L"Unsupported");
 
 	length = sizeof (buffer);
 
@@ -1146,7 +1258,8 @@ NTSTATUS GetUrlInfo (
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_ETAG, &buffer, &length))
 	{
-		StrTrim (buffer, L"\""); // Strip Quotes
+		_r_str_trim (buffer, L"\""); // Strip Quotes
+
 		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 	}
 	else
@@ -1184,11 +1297,14 @@ NTSTATUS GetUrlInfo (
 
 	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 
-	if (url)
-		_r_obj_dereference (url);
+	if (proxy_string)
+		_r_obj_dereference (proxy_string);
 
 	if (string)
 		_r_obj_dereference (string);
+
+	if (url)
+		_r_obj_dereference (url);
 
 	_r_inet_close (hsession);
 
@@ -1199,11 +1315,12 @@ NTSTATUS GetUrlInfo (
 		_r_inet_close (hrequest);
 
 	_r_ctrl_enable (hwnd, IDC_URLINFO_START, TRUE);
+	_r_ctrl_enable (hwnd, IDC_URLINFO_CLEAR, TRUE);
 
 	return STATUS_SUCCESS;
 }
 
-VOID PrintTcpStats (
+VOID _app_print_tcpstats (
 	_In_ HWND hwnd,
 	_Out_ PMIB_TCPSTATS2 stats,
 	_In_ ULONG family
@@ -1402,7 +1519,7 @@ VOID PrintTcpStats (
 	}
 }
 
-VOID PrintUdpStats (
+VOID _app_print_udpstats (
 	_In_ HWND hwnd,
 	_Out_ PMIB_UDPSTATS2 stats,
 	_In_ ULONG family
@@ -1417,6 +1534,7 @@ VOID PrintUdpStats (
 	if (status != NO_ERROR)
 	{
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: " SZ_HEX, status);
+
 		_r_listview_fillitems (hwnd, IDC_UDP_STATISTIC, 0, 5, 1, buffer, IL_FAULT);
 	}
 	else
@@ -1465,7 +1583,7 @@ VOID PrintUdpStats (
 	}
 }
 
-VOID PrintIcmpStats (
+VOID _app_print_icmpstats (
 	_In_ HWND hwnd,
 	_Out_ PMIB_ICMP_EX_XPSP1 stats,
 	_In_ ULONG family
@@ -1523,7 +1641,7 @@ VOID PrintIcmpStats (
 	}
 }
 
-VOID PrintIpStats (
+VOID _app_print_ipstats (
 	_In_ HWND hwnd,
 	_Out_ PMIB_IPSTATS_LH stats,
 	_In_ ULONG family
@@ -1764,48 +1882,49 @@ VOID CALLBACK TimerProc (
 	if (id_event != 1337)
 		return;
 
-	dlg_id = GetCurrentPage (hwnd);
+	dlg_id = _app_getcurrentpage (hwnd);
 
 	hwnd = page_list[dlg_id].hpage;
-
 
 	switch (page_list[dlg_id].dlg_id)
 	{
 		case IDD_PAGE_TCP_STATISTIC:
 		{
-			PrintTcpStats (hwnd, &tcp_stat, AF_INET);
-			PrintTcpStats (hwnd, &tcp_stat, AF_INET6);
+			_app_print_tcpstats (hwnd, &tcp_stat, AF_INET);
+			_app_print_tcpstats (hwnd, &tcp_stat, AF_INET6);
 
 			break;
 		}
 
 		case IDD_PAGE_UDP_STATISTIC:
 		{
-			PrintUdpStats (hwnd, &udp_stat, AF_INET);
-			PrintUdpStats (hwnd, &udp_stat, AF_INET6);
+			_app_print_udpstats (hwnd, &udp_stat, AF_INET);
+			_app_print_udpstats (hwnd, &udp_stat, AF_INET6);
 
 			break;
 		}
 
 		case IDD_PAGE_ICMP_STATISTIC:
 		{
-			PrintIcmpStats (hwnd, &icmp_stat, AF_INET);
-			PrintIcmpStats (hwnd, &icmp_stat, AF_INET6);
+			_app_print_icmpstats (hwnd, &icmp_stat, AF_INET);
+			_app_print_icmpstats (hwnd, &icmp_stat, AF_INET6);
 
 			break;
 		}
 
 		case IDD_PAGE_IP_STATISTIC:
 		{
-			PrintIpStats (hwnd, &ip_stat, AF_INET);
-			PrintIpStats (hwnd, &ip_stat, AF_INET6);
+			_app_print_ipstats (hwnd, &ip_stat, AF_INET);
+			_app_print_ipstats (hwnd, &ip_stat, AF_INET6);
 
 			break;
 		}
 	}
 }
 
-VOID InitializePages ()
+VOID _app_initializepages (
+	_In_ HWND hwnd
+)
 {
 	ULONG_PTR idx = 0;
 
@@ -1824,9 +1943,9 @@ VOID InitializePages ()
 	// categories
 	idx = 0;
 
-	_r_str_copy (category_list[idx++].name, RTL_NUMBER_OF (category_list[idx].name), L"Tools");
-	_r_str_copy (category_list[idx++].name, RTL_NUMBER_OF (category_list[idx].name), L"Information");
-	_r_str_copy (category_list[idx++].name, RTL_NUMBER_OF (category_list[idx].name), L"Statistics");
+	category_list[idx++].name = IDS_CATEGORY_TOOLS;
+	category_list[idx++].name = IDS_CATEGORY_INFORMATION;
+	category_list[idx++].name = IDS_CATEGORY_STATISTICS;
 
 	// pages
 	idx = 0;
@@ -1834,53 +1953,53 @@ VOID InitializePages ()
 	page_list[idx].dlg_id = IDD_PAGE_PING;
 	page_list[idx].listview_id = IDC_PING_RESULT;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Ping");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Диагностика доступности удаленных ресурсов");
+	page_list[idx].title = IDS_TOOL_PING;
+	page_list[idx].description = IDS_TOOL_PING_INFO;
 
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_SPEEDMETER;
 	page_list[idx].listview_id = IDC_SPEEDMETER_RESULT;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Download speed");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Тестирование скорости загрузки данных из сети");
+	page_list[idx].title = IDS_TOOL_SPEED;
+	page_list[idx].description = IDS_TOOL_SPEED_INFO;
 
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_URLDECODER;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Url decoder");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Приведение ссылок из \"percent-encoding\" в нормальный вид");
+	page_list[idx].title = IDS_TOOL_DECODER;
+	page_list[idx].description = IDS_TOOL_DECODER_INFO;
 
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_URLINFO;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Link information");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Получение списка IP адресов сайта");
+	page_list[idx].title = IDS_TOOL_INFORMATION;
+	page_list[idx].description = IDS_TOOL_INFORMATION_INFO;
 
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_HOSTADDR;
 	page_list[idx].listview_id = IDC_HOSTADDR_RESULT;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Host address");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Вывод списка IP адресов в системе");
+	page_list[idx].title = IDS_TOOL_HOSTADDRESS;
+	page_list[idx].description = IDS_TOOL_HOSTADDRESS_INFO;
 
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_WHOIS;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Whois");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Получение регистрационных данных о владельцах доменных имен");
+	page_list[idx].title = IDS_TOOL_WHOIS;
+	page_list[idx].description = IDS_TOOL_WHOIS_INFO;
 
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_IP;
 	page_list[idx].category = 1;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"IP");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Вывод информации о общих ресурсах в системе");
+	page_list[idx].title = IDS_TOOL_IP;
+	page_list[idx].description = IDS_TOOL_IP_INFO;
 
 	idx += 1;
 
@@ -1888,8 +2007,8 @@ VOID InitializePages ()
 	page_list[idx].listview_id = IDC_SHAREDINFO;
 	page_list[idx].category = 1;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"Shared resources");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Вывод информации о общих ресурсах в системе");
+	page_list[idx].title = IDS_TOOL_SHARED;
+	page_list[idx].description = IDS_TOOL_SHARED_INFO;
 
 	idx += 1;
 
@@ -1897,8 +2016,8 @@ VOID InitializePages ()
 	page_list[idx].listview_id = IDC_SYSINFO;
 	page_list[idx].category = 1;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"System");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Показ краткой информации о системе");
+	page_list[idx].title = IDS_TOOL_SYSTEM;
+	page_list[idx].description = IDS_TOOL_SYSTEM_INFO;
 
 	idx += 1;
 
@@ -1906,8 +2025,8 @@ VOID InitializePages ()
 	page_list[idx].listview_id = IDC_TCP_STATISTIC;
 	page_list[idx].category = 2;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"TCP");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования TCP протокола");
+	page_list[idx].title = IDS_TOOL_TCP;
+	page_list[idx].description = IDS_TOOL_TCP_INFO;
 
 	idx += 1;
 
@@ -1915,8 +2034,8 @@ VOID InitializePages ()
 	page_list[idx].listview_id = IDC_UDP_STATISTIC;
 	page_list[idx].category = 2;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"UDP");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования UDP протокола");
+	page_list[idx].title = IDS_TOOL_UDP;
+	page_list[idx].description = IDS_TOOL_UDP_INFO;
 
 	idx += 1;
 
@@ -1924,8 +2043,8 @@ VOID InitializePages ()
 	page_list[idx].listview_id = IDC_ICMP_STATISTIC;
 	page_list[idx].category = 2;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"ICMP");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования ICMP протокола");
+	page_list[idx].title = IDS_TOOL_ICMP;
+	page_list[idx].description = IDS_TOOL_ICMP_INFO;
 
 	idx += 1;
 
@@ -1933,11 +2052,26 @@ VOID InitializePages ()
 	page_list[idx].listview_id = IDC_IP_STATISTIC;
 	page_list[idx].category = 2;
 
-	_r_str_copy (page_list[idx].title, RTL_NUMBER_OF (page_list[idx].title), L"IP");
-	_r_str_copy (page_list[idx].description, RTL_NUMBER_OF (page_list[idx].description), L"Статистика использования IP");
+	page_list[idx].title = IDS_TOOL_IPSTATS;
+	page_list[idx].description = IDS_TOOL_IPSTATS_INFO;
+
+	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (category_list); i++)
+	{
+		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, NULL, NULL, 0);
+	}
+
+	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (page_list); i++)
+	{
+		page_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (page_list[i].title), IL_FOLDER, category_list[page_list[i].category].hitem, NULL, (LPARAM)i);
+
+		page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCE (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
+
+		if (page_list[i].hpage)
+			_app_setpagepos (hwnd, page_list[i].hpage);
+	}
 }
 
-VOID InitializePage (
+VOID _app_initializepage (
 	_In_ HWND hwnd,
 	_In_ INT page_id
 )
@@ -1960,7 +2094,7 @@ VOID InitializePage (
 
 			_r_listview_setstyle (hwnd, IDC_PING_RESULT, EX_STYLE, FALSE);
 
-			_r_listview_setimagelist (hwnd, IDC_PING_RESULT, himglist);
+			_r_listview_setimagelist (hwnd, IDC_PING_RESULT, config.himglist);
 
 			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 0, L"Address", 190, 0);
 			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 1, L"Size", 100, 0);
@@ -1974,7 +2108,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_SPEEDMETER_RESULT, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_SPEEDMETER_RESULT, himglist);
+			_r_listview_setimagelist (hwnd, IDC_SPEEDMETER_RESULT, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_SPEEDMETER_RESULT);
 
@@ -2023,7 +2157,7 @@ VOID InitializePage (
 
 			_r_listview_setstyle (hwnd, IDC_HOSTADDR_RESULT, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_HOSTADDR_RESULT, himglist);
+			_r_listview_setimagelist (hwnd, IDC_HOSTADDR_RESULT, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_HOSTADDR_RESULT);
 
@@ -2061,7 +2195,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_URLINFO_RESULT, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_URLINFO_RESULT, himglist);
+			_r_listview_setimagelist (hwnd, IDC_URLINFO_RESULT, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_URLINFO_RESULT);
 
@@ -2095,7 +2229,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_IP_RESULT, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_IP_RESULT, himglist);
+			_r_listview_setimagelist (hwnd, IDC_IP_RESULT, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_IP_RESULT);
 
@@ -2125,7 +2259,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_SHAREDINFO, EX_STYLE, FALSE);
 
-			_r_listview_setimagelist (hwnd, IDC_SHAREDINFO, himglist);
+			_r_listview_setimagelist (hwnd, IDC_SHAREDINFO, config.himglist);
 
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 0, L"Name", 190, 0);
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 1, L"Path", 190, 0);
@@ -2141,7 +2275,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_SYSINFO, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_SYSINFO, himglist);
+			_r_listview_setimagelist (hwnd, IDC_SYSINFO, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_SYSINFO);
 
@@ -2171,7 +2305,7 @@ VOID InitializePage (
 			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Host name", IL_SUCCESS, 3, 0);
 			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Computer name", IL_SUCCESS, 3, 0);
 
-			GetSysInfo (hwnd);
+			_app_tool_sysinfo (hwnd);
 
 			break;
 		}
@@ -2180,7 +2314,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_TCP_STATISTIC, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_TCP_STATISTIC, himglist);
+			_r_listview_setimagelist (hwnd, IDC_TCP_STATISTIC, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_TCP_STATISTIC);
 
@@ -2233,7 +2367,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_UDP_STATISTIC, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_UDP_STATISTIC, himglist);
+			_r_listview_setimagelist (hwnd, IDC_UDP_STATISTIC, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_UDP_STATISTIC);
 
@@ -2266,7 +2400,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_ICMP_STATISTIC, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_ICMP_STATISTIC, himglist);
+			_r_listview_setimagelist (hwnd, IDC_ICMP_STATISTIC, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_ICMP_STATISTIC);
 
@@ -2297,7 +2431,7 @@ VOID InitializePage (
 		{
 			_r_listview_setstyle (hwnd, IDC_IP_STATISTIC, EX_STYLE, TRUE);
 
-			_r_listview_setimagelist (hwnd, IDC_IP_STATISTIC, himglist);
+			_r_listview_setimagelist (hwnd, IDC_IP_STATISTIC, config.himglist);
 
 			width = _r_ctrl_getwidth (hwnd, IDC_IP_STATISTIC);
 
@@ -2373,34 +2507,24 @@ INT_PTR WINAPI PageDlgProc (
 	_In_ LPARAM lparam
 )
 {
-	//static R_LAYOUT_MANAGER layout = {0};
-
 	switch (msg)
 	{
 		case WM_INITDIALOG:
 		{
-			//_r_layout_initializemanager (&layout, hwnd);
+			_app_initializepage (hwnd, IDD_PAGE_PING);
+			_app_initializepage (hwnd, IDD_PAGE_SPEEDMETER);
+			_app_initializepage (hwnd, IDD_PAGE_URLDECODER);
+			_app_initializepage (hwnd, IDD_PAGE_HOSTADDR);
+			_app_initializepage (hwnd, IDD_PAGE_URLINFO);
+			_app_initializepage (hwnd, IDD_PAGE_IP);
+			_app_initializepage (hwnd, IDD_PAGE_WHOIS);
+			_app_initializepage (hwnd, IDD_PAGE_SHAREDINFO);
+			_app_initializepage (hwnd, IDD_PAGE_SYSINFO);
+			_app_initializepage (hwnd, IDD_PAGE_TCP_STATISTIC);
+			_app_initializepage (hwnd, IDD_PAGE_UDP_STATISTIC);
+			_app_initializepage (hwnd, IDD_PAGE_ICMP_STATISTIC);
+			_app_initializepage (hwnd, IDD_PAGE_IP_STATISTIC);
 
-			InitializePage (hwnd, IDD_PAGE_PING);
-			InitializePage (hwnd, IDD_PAGE_SPEEDMETER);
-			InitializePage (hwnd, IDD_PAGE_URLDECODER);
-			InitializePage (hwnd, IDD_PAGE_HOSTADDR);
-			InitializePage (hwnd, IDD_PAGE_URLINFO);
-			InitializePage (hwnd, IDD_PAGE_IP);
-			InitializePage (hwnd, IDD_PAGE_WHOIS);
-			InitializePage (hwnd, IDD_PAGE_SHAREDINFO);
-			InitializePage (hwnd, IDD_PAGE_SYSINFO);
-			InitializePage (hwnd, IDD_PAGE_TCP_STATISTIC);
-			InitializePage (hwnd, IDD_PAGE_UDP_STATISTIC);
-			InitializePage (hwnd, IDD_PAGE_ICMP_STATISTIC);
-			InitializePage (hwnd, IDD_PAGE_IP_STATISTIC);
-
-			break;
-		}
-
-		case WM_SIZE:
-		{
-			//_r_layout_resize (&layout, wparam);
 			break;
 		}
 
@@ -2413,6 +2537,7 @@ INT_PTR WINAPI PageDlgProc (
 			if (GetDlgItem (hwnd, IDC_PING_HOST))
 			{
 				GetDlgItemText (hwnd, IDC_PING_HOST, buffer, RTL_NUMBER_OF (buffer));
+
 				_r_config_setstring (L"PingAddress", buffer);
 			}
 
@@ -2432,24 +2557,28 @@ INT_PTR WINAPI PageDlgProc (
 					_r_config_setlong (L"SpeedMeterLimit", item_id);
 
 				GetDlgItemText (hwnd, IDC_SPEEDMETER_LINK, buffer, RTL_NUMBER_OF (buffer));
+
 				_r_config_setstring (L"SpeedmeterLink", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLDECODER_LINK))
 			{
 				GetDlgItemText (hwnd, IDC_URLDECODER_LINK, buffer, RTL_NUMBER_OF (buffer));
+
 				_r_config_setstring (L"UrlDecoderLink", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_HOSTADDR_HOST))
 			{
 				GetDlgItemText (hwnd, IDC_HOSTADDR_HOST, buffer, RTL_NUMBER_OF (buffer));
+
 				_r_config_setstring (L"HostAddrAddress", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLINFO_LINK))
 			{
 				GetDlgItemText (hwnd, IDC_URLINFO_LINK, buffer, RTL_NUMBER_OF (buffer));
+
 				_r_config_setstring (L"UrlInfoLink", buffer);
 			}
 
@@ -2462,6 +2591,7 @@ INT_PTR WINAPI PageDlgProc (
 			if (GetDlgItem (hwnd, IDC_WHOIS_HOST))
 			{
 				GetDlgItemText (hwnd, IDC_WHOIS_HOST, buffer, RTL_NUMBER_OF (buffer));
+
 				_r_config_setstring (L"WhoisAddress", buffer);
 			}
 
@@ -2487,7 +2617,7 @@ INT_PTR WINAPI PageDlgProc (
 			HMENU hsubmenu;
 			ULONG_PTR page_id;
 
-			page_id = GetCurrentPage (hwnd);
+			page_id = _app_getcurrentpage (hwnd);
 
 			if (!page_list[page_id].listview_id)
 				break;
@@ -2530,18 +2660,16 @@ INT_PTR WINAPI PageDlgProc (
 					R_STRINGBUILDER buffer;
 					PR_STRING string;
 					ULONG_PTR page_id;
-					INT item_id;
+					INT item_id = -1;
 					INT column_count;
 
-					page_id = GetCurrentPage (hwnd);
+					page_id = _app_getcurrentpage (hwnd);
 
 					if (!page_list[page_id].listview_id)
 						break;
 
 					if (GetFocus () != GetDlgItem (page_list[page_id].hpage, page_list[page_id].listview_id))
 						break;
-
-					item_id = -1;
 
 					column_count = _r_listview_getcolumncount (page_list[page_id].hpage, page_list[page_id].listview_id);
 
@@ -2584,7 +2712,7 @@ INT_PTR WINAPI PageDlgProc (
 				{
 					ULONG_PTR page_id;
 
-					page_id = GetCurrentPage (hwnd);
+					page_id = _app_getcurrentpage (hwnd);
 
 					if (!page_list[page_id].listview_id)
 						break;
@@ -2596,63 +2724,62 @@ INT_PTR WINAPI PageDlgProc (
 
 					break;
 				}
-				*/
-				/*
+
 				case IDC_LISTVIEW_COPY:
 				{
-					//PR_STRING string;
-					//
-					//if (GetListViewText (GetDlgItem (hwnd, page_list.listview_id[page_id]), buff, 4096, 1))
-					//	_r_clipboard_set (hwnd, &string->sr);
+					PR_STRING string;
+
+					if (GetListViewText (GetDlgItem (hwnd, page_list.listview_id[page_id]), buff, 4096, 1))
+						_r_clipboard_set (hwnd, &string->sr);
 
 					break;
 				}
 
 				case IDC_COPY_VALUE:
 				{
-					//WCHAR buff[4096] = {0};
-					//ULONG_PTR page_id;
-					//
-					//page_id = GetCurrentPage (hwnd);
-					//
-					//if (GetListViewText (GetDlgItem (hwnd, page_list[page_id].listview_id), buff, 4096, 1, 1))
-					//	SetClipboardText (buff, 4096);
+					WCHAR buff[4096] = {0};
+					ULONG_PTR page_id;
+
+					page_id = _app_getcurrentpage (hwnd);
+
+					if (GetListViewText (GetDlgItem (hwnd, page_list[page_id].listview_id), buff, 4096, 1, 1))
+						SetClipboardText (buff, 4096);
 
 					break;
 				}
 
 				case IDC_SAVE_AS:
 				{
-					//OPENFILENAME of = {0};
-					//WCHAR buff[4096] = {0};
-					//HANDLE hfile;
-					//CHAR header[2] = {0xFF, 0xFE};
-					//ULONG dwWriten = 0;
-					//
-					//_r_str_copy (buffer, RTL_NUMBER_OF(buffer), L"report.txt");
-					//
-					//of.lStructSize = sizeof (of);
-					//of.hwndOwner = hwnd;
-					//of.lpstrFilter = L"Все файлы (*.*)\0*.*";
-					//of.lpstrFile = buffer;
-					//of.nMaxFile = RTL_NUMBER_OF(buffer);
-					//of.Flags = OFN_EXPLORER | OFN_FORCESHOWHIDDEN | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT;
-					//
-					//if (GetSaveFileName (&of))
-					//{
-					//	if (GetListViewText (GetDlgItem (hwnd, page_list[page_id].listview_id), buff, 4096))
-					//	{
-					//		hfile = CreateFile (buffer, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-					//
-					//		if (!hfile)
-					//			break;
-					//
-					//		WriteFile (hfile, header, 2, &dwWriten, NULL); // Write Header
-					//		WriteFile (hfile, buff, (lstrlen (buff) * 2) + dwWriten - 1, &dwWriten, NULL); // Write Text
-					//
-					//		CloseHandle (hfile);
-					//	}
-					//}
+					OPENFILENAME of = {0};
+					WCHAR buff[4096] = {0};
+					HANDLE hfile;
+					CHAR header[2] = {0xFF, 0xFE};
+					ULONG dwWriten = 0;
+
+					_r_str_copy (buffer, RTL_NUMBER_OF(buffer), L"report.txt");
+
+					of.lStructSize = sizeof (of);
+					of.hwndOwner = hwnd;
+					of.lpstrFilter = L"Все файлы (*.*)\0*.*";
+					of.lpstrFile = buffer;
+					of.nMaxFile = RTL_NUMBER_OF(buffer);
+					of.Flags = OFN_EXPLORER | OFN_FORCESHOWHIDDEN | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT;
+
+					if (GetSaveFileName (&of))
+					{
+						if (GetListViewText (GetDlgItem (hwnd, page_list[page_id].listview_id), buff, 4096))
+						{
+							hfile = CreateFile (buffer, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+							if (!hfile)
+								break;
+
+							WriteFile (hfile, header, 2, &dwWriten, NULL); // Write Header
+							WriteFile (hfile, buff, (lstrlen (buff) * 2) + dwWriten - 1, &dwWriten, NULL); // Write Text
+
+							CloseHandle (hfile);
+						}
+					}
 
 					break;
 				}
@@ -2661,7 +2788,7 @@ INT_PTR WINAPI PageDlgProc (
 				{
 					ULONG_PTR page_id;
 
-					page_id = GetPageId (IDD_PAGE_PING);
+					page_id = _app_getpageid (IDD_PAGE_PING);
 
 					if (page_list[page_id].thread)
 					{
@@ -2670,18 +2797,7 @@ INT_PTR WINAPI PageDlgProc (
 					}
 					else
 					{
-						_r_sys_createthread (&GetPing, hwnd, NULL, NULL, L"Ping");
-					}
-
-					break;
-				}
-
-				case IDC_PING_CLEAR:
-				{
-					if (_r_listview_getitemcount (hwnd, IDC_PING_RESULT))
-					{
-						if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-							_r_listview_deleteallitems (hwnd, IDC_PING_RESULT);
+						_r_sys_createthread (&_app_tool_ping, hwnd, NULL, NULL, L"Ping");
 					}
 
 					break;
@@ -2691,7 +2807,7 @@ INT_PTR WINAPI PageDlgProc (
 				{
 					ULONG_PTR page_id;
 
-					page_id = GetPageId (IDD_PAGE_SPEEDMETER);
+					page_id = _app_getpageid (IDD_PAGE_SPEEDMETER);
 
 					if (page_list[page_id].thread)
 					{
@@ -2700,60 +2816,27 @@ INT_PTR WINAPI PageDlgProc (
 					}
 					else
 					{
-						_r_sys_createthread (&GetDownloadSpeed, hwnd, NULL, NULL, L"DownloadSpeed");
+						_r_sys_createthread (&_app_tool_downloadspeed, hwnd, NULL, NULL, L"DownloadSpeed");
 					}
-
-					break;
-				}
-
-				case IDC_SPEEDMETER_CLEAR:
-				{
-					if (!_r_listview_getitemcount (hwnd, IDC_SPEEDMETER_RESULT))
-						break;
-
-					if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-						_r_listview_deleteallitems (hwnd, IDC_SPEEDMETER_RESULT);
 
 					break;
 				}
 
 				case IDC_URLDECODER_START:
 				{
-					UrlDecoder (hwnd);
-					break;
-				}
-
-				case IDC_URLDECODER_CLEAR:
-				{
-					if (_r_ctrl_getstringlength (hwnd, IDC_URLDECODER_RESULT))
-					{
-						if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-							_r_ctrl_setstring (hwnd, IDC_URLDECODER_RESULT, NULL);
-					}
-
+					_app_tool_urldecoder (hwnd);
 					break;
 				}
 
 				case IDC_HOSTADDR_START:
 				{
-					GetHostAddress (hwnd);
-					break;
-				}
-
-				case IDC_HOSTADDR_CLEAR:
-				{
-					if (_r_listview_getitemcount (hwnd, IDC_HOSTADDR_RESULT))
-					{
-						if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-							_r_listview_deleteallitems (hwnd, IDC_HOSTADDR_RESULT);
-					}
-
+					_app_tool_hostaddress (hwnd);
 					break;
 				}
 
 				case IDC_URLINFO_START:
 				{
-					_r_sys_createthread (&GetUrlInfo, hwnd, NULL, NULL, L"UrlInfo");
+					_r_sys_createthread (&_app_tool_urlinfo, hwnd, NULL, NULL, L"UrlInfo");
 					break;
 				}
 
@@ -2771,46 +2854,53 @@ INT_PTR WINAPI PageDlgProc (
 
 				case IDC_IP_REFRESH:
 				{
-					GetIpAddress (hwnd);
+					if (_r_ctrl_isbuttonchecked (hwnd, IDC_IP_EXTERNAL_CHK))
+					{
+						_r_sys_createthread (&_app_tool_externalip, hwnd, NULL, NULL, L"ExternalIp");
+					}
+					else
+					{
+						_r_listview_fillitems (hwnd, IDC_IP_RESULT, -1, -1, 1, L"n/a", IL_FAULT);
+					}
+
 					break;
 				}
 
 				case IDC_WHOIS_START:
 				{
-					_r_sys_createthread (&GetWhois, hwnd, NULL, NULL, L"Whois");
-					break;
-				}
-
-				case IDC_WHOIS_CLEAR:
-				{
-					if (_r_ctrl_getstringlength (hwnd, IDC_WHOIS_RESULT))
-					{
-						if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-							_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, NULL);
-					}
-
+					_r_sys_createthread (&_app_tool_whois, hwnd, NULL, NULL, L"Whois");
 					break;
 				}
 
 				case IDC_SHAREDINFO_START:
 				{
-					GetSharedInfo (hwnd);
+					_app_tool_sharedinfo (hwnd);
 					break;
 				}
 
+				case IDC_PING_CLEAR:
+				case IDC_SPEEDMETER_CLEAR:
+				case IDC_URLDECODER_CLEAR:
+				case IDC_HOSTADDR_CLEAR:
+				case IDC_URLINFO_CLEAR:
+				case IDC_WHOIS_CLEAR:
 				case IDC_SHAREDINFO_CLEAR:
 				{
-					if (_r_listview_getitemcount (hwnd, IDC_SHAREDINFO))
-					{
-						if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-							_r_listview_deleteallitems (hwnd, IDC_SHAREDINFO);
-					}
+					ULONG_PTR page_id;
+
+					page_id = _app_getcurrentpage (hwnd);
+
+					if (!_r_listview_getitemcount (hwnd, page_list[page_id].listview_id))
+						break;
+
+					if (_r_show_confirmmessage (hwnd, NULL, L"Do you want to clear data?", L"ClearConfirm"))
+						_r_listview_deleteallitems (hwnd, page_list[page_id].listview_id);
 
 					break;
 				}
-			}
 
-			break;
+				break;
+			}
 		}
 	}
 
@@ -2830,13 +2920,11 @@ LRESULT CALLBACK DlgProc (
 	{
 		case WM_INITDIALOG:
 		{
+			HMENU hsubmenu;
 			HMENU hmenu;
-			HICON hicon;
 			ULONG_PTR page_id;
 			LONG status;
 			INT parts[2] = {0};
-
-			InitializePages ();
 
 			status = WSAStartup (WINSOCK_VERSION, &wsa);
 
@@ -2849,21 +2937,7 @@ LRESULT CALLBACK DlgProc (
 
 			_r_treeview_setstyle (hwnd, IDC_ITEMLIST, TVS_EX_DOUBLEBUFFER | TVS_EX_FADEINOUTEXPANDOS, 0, 0);
 
-			himglist = ImageList_Create (16, 16, ILC_COLOR32 | ILC_MASK, 0, 5);
-
-			_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER), 16, &hicon);
-			ImageList_ReplaceIcon (himglist, -1, hicon);
-
-			_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER_CURRENT), 16, &hicon);
-			ImageList_ReplaceIcon (himglist, -1, hicon);
-
-			_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_SUCCESS), 16, &hicon);
-			ImageList_ReplaceIcon (himglist, -1, hicon);
-
-			_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FAULT), 16, &hicon);
-			ImageList_ReplaceIcon (himglist, -1, hicon);
-
-			SendDlgItemMessage (hwnd, IDC_ITEMLIST, TVM_SETIMAGELIST, TVSIL_NORMAL, (LPARAM)himglist);
+			_app_imagelist_init (hwnd, 0);
 
 			hmenu = GetMenu (hwnd);
 
@@ -2871,6 +2945,11 @@ LRESULT CALLBACK DlgProc (
 			{
 				_r_menu_checkitem (hmenu, IDM_ALWAYSONTOP_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"AlwaysOnTop", FALSE));
 				_r_menu_checkitem (hmenu, IDM_CHECKUPDATES_CHK, 0, MF_BYCOMMAND, _r_update_isenabled (FALSE));
+
+				hsubmenu = GetSubMenu (hmenu, 1);
+
+				if (hsubmenu)
+					_r_locale_enum (hsubmenu, LANG_MENU, IDX_LANGUAGE); // enum localizations
 			}
 
 			parts[0] = 200;
@@ -2878,24 +2957,11 @@ LRESULT CALLBACK DlgProc (
 
 			_r_status_setparts (hwnd, IDC_STATUSBAR, parts, RTL_NUMBER_OF (parts));
 
-			for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (category_list); i++)
-			{
-				category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, category_list[i].name, IL_FOLDER, NULL, NULL, 0);
-			}
+			_app_initializepages (hwnd);
 
-			for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (page_list); i++)
-			{
-				page_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, page_list[i].title, IL_FOLDER, category_list[page_list[i].category].hitem, NULL, (LPARAM)i);
+			page_id = _app_getcurrentpage (hwnd);
 
-				page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCE (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
-
-				if (page_list[i].hpage)
-					SetPagePos (hwnd, page_list[i].hpage);
-			}
-
-			page_id = GetCurrentPage (hwnd);
-
-			SetCurrentPage (hwnd, _r_config_getlong (L"LastItem", (LONG)GetPageId (IDD_PAGE_SYSINFO)));
+			_app_setcurrentpage (hwnd, _r_config_getlong (L"LastItem", (LONG)_app_getpageid (IDD_PAGE_SYSINFO)));
 
 			SetTimer (hwnd, 1337, 1000, &TimerProc);
 
@@ -2904,43 +2970,101 @@ LRESULT CALLBACK DlgProc (
 			break;
 		}
 
+		case RM_LOCALIZE:
+		{
+			HMENU hmenu;
+			HMENU hsubmenu;
+			LONG dpi_value;
+
+			dpi_value = _r_dc_getwindowdpi (hwnd);
+
+			for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (category_list); i++)
+			{
+				_r_treeview_setitem (hwnd, IDC_ITEMLIST, category_list[i].hitem, _r_locale_getstring (category_list[i].name), IL_FOLDER, 0);
+			}
+
+			for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (page_list); i++)
+			{
+				_r_treeview_setitem (hwnd, IDC_ITEMLIST, page_list[i].hitem, _r_locale_getstring (page_list[i].title), IL_FOLDER, (LPARAM)i);
+			}
+
+			hmenu = GetMenu (hwnd);
+
+			if (!hmenu)
+				break;
+
+			_r_menu_setitemtext (hmenu, 0, TRUE, _r_locale_getstring (IDS_FILE));
+			_r_menu_setitemtext (hmenu, 1, TRUE, _r_locale_getstring (IDS_SETTINGS));
+			_r_menu_setitemtext (hmenu, 2, TRUE, _r_locale_getstring (IDS_HELP));
+
+			_r_menu_setitemtextformat (hmenu, IDM_EXIT, FALSE, L"%s\tEsc", _r_locale_getstring (IDS_EXIT));
+			_r_menu_setitemtext (hmenu, IDM_ALWAYSONTOP_CHK, FALSE, _r_locale_getstring (IDS_ALWAYSONTOP_CHK));
+			_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_CHECKUPDATES_CHK));
+			_r_menu_setitemtext (hmenu, IDM_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
+			_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES, FALSE, _r_locale_getstring (IDS_CHECKUPDATES));
+			_r_menu_setitemtextformat (hmenu, IDM_ABOUT, FALSE, L"%s\tF1", _r_locale_getstring (IDS_ABOUT));
+
+			hsubmenu = GetSubMenu (hmenu, 1);
+
+			if (hsubmenu)
+			{
+				_r_menu_setitemtextformat (hsubmenu, LANG_MENU, TRUE, L"%s (Language)", _r_locale_getstring (IDS_LANGUAGE));
+
+				_r_locale_enum (hsubmenu, LANG_MENU, IDX_LANGUAGE); // enum localizations
+			}
+
+			break;
+		}
+
 		case WM_CLOSE:
+		{
+			DestroyWindow (hwnd);
+			break;
+		}
+
+		case WM_DESTROY:
 		{
 			KillTimer (hwnd, 1337);
 
 			for (INT i = 0; i < PAGE_COUNT; i++)
 				page_list[i].thread = FALSE;
 
-			_r_config_setlong (L"LastItem", (LONG)GetCurrentPage (hwnd));
+			_r_config_setlong (L"LastItem", (LONG)_app_getcurrentpage (hwnd));
+
+			ImageList_Destroy (config.himglist);
 
 			WSACleanup ();
 
-			DestroyWindow (hwnd);
 			PostQuitMessage (0);
 
 			break;
 		}
 
-		//case WM_DESTROY:
-		//{
-		//	KillTimer (hwnd, 1337);
-		//
-		//	for (INT i = 0; i < PAGE_COUNT; i++)
-		//		page_list[i].thread = FALSE;
-		//
-		//	_r_config_setlong (L"LastItem", (LONG)GetCurrentPage (hwnd));
-		//
-		//	WSACleanup ();
-		//
-		//	DestroyWindow (hwnd);
-		//	PostQuitMessage (0);
-		//
-		//	break;
-		//}
-
 		case WM_SIZE:
 		{
 			_r_layout_resize (&layout_manager, wparam);
+			break;
+		}
+
+		case WM_DPICHANGED:
+		{
+			_r_wnd_message_dpichanged (hwnd, wparam, lparam);
+
+			_app_imagelist_init (hwnd, LOWORD (wparam));
+
+			SendMessage (hwnd, WM_SIZE, 0, 0);
+
+			break;
+		}
+
+		case WM_THEMECHANGED:
+		{
+			LONG dpi_value;
+
+			dpi_value = _r_dc_getwindowdpi (hwnd);
+
+			SendMessage (hwnd, WM_SIZE, 0, 0);
+
 			break;
 		}
 
@@ -2996,10 +3120,10 @@ LRESULT CALLBACK DlgProc (
 					if (!page_list[page_id].hpage)
 						break;
 
-					SetPagePos (hwnd, page_list[page_id].hpage);
+					_app_setpagepos (hwnd, page_list[page_id].hpage);
 
-					_r_status_settext (hwnd, IDC_STATUSBAR, 0, page_list[page_id].title);
-					_r_status_settext (hwnd, IDC_STATUSBAR, 1, page_list[page_id].description);
+					_r_status_settext (hwnd, IDC_STATUSBAR, 0, _r_locale_getstring (page_list[page_id].title));
+					_r_status_settext (hwnd, IDC_STATUSBAR, 1, _r_locale_getstring (page_list[page_id].description));
 
 					break;
 				}
@@ -3008,7 +3132,7 @@ LRESULT CALLBACK DlgProc (
 				{
 					LONG_PTR result;
 
-					result = TreeView_CustDraw (hwnd, (LPNMTVCUSTOMDRAW)lparam);
+					result = _app_treeview_custdraw (hwnd, (LPNMTVCUSTOMDRAW)lparam);
 
 					SetWindowLongPtr (hwnd, DWLP_MSGRESULT, result);
 					return result;
@@ -3021,6 +3145,28 @@ LRESULT CALLBACK DlgProc (
 		case WM_COMMAND:
 		{
 			INT ctrl_id = LOWORD (wparam);
+			INT notify_code = HIWORD (wparam);
+
+			if (notify_code == 0)
+			{
+				if (ctrl_id >= IDX_LANGUAGE && ctrl_id <= IDX_LANGUAGE + (INT)(INT_PTR)_r_locale_getcount () + 1)
+				{
+					HMENU hmenu;
+					HMENU hsubmenu;
+
+					hmenu = GetMenu (hwnd);
+
+					if (hmenu)
+					{
+						hsubmenu = GetSubMenu (GetSubMenu (hmenu, 1), LANG_MENU);
+
+						if (hsubmenu)
+							_r_locale_apply (hsubmenu, ctrl_id, IDX_LANGUAGE);
+					}
+
+					return FALSE;
+				}
+			}
 
 			switch (ctrl_id)
 			{
@@ -3069,7 +3215,7 @@ LRESULT CALLBACK DlgProc (
 					break;
 				}
 
-				case IDM_CHECK_UPDATES:
+				case IDM_CHECKUPDATES:
 				{
 					_r_update_check (hwnd);
 					break;
