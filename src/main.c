@@ -196,7 +196,7 @@ ULONG_PTR _app_getcurrentpage (
 	if (!hitem)
 		return 0;
 
-	lparam = _r_treeview_getlparam (hwnd, IDC_ITEMLIST, hitem);
+	lparam = _r_treeview_getitemlparam (hwnd, IDC_ITEMLIST, hitem);
 
 	if (lparam < 0)
 		lparam = 0;
@@ -291,7 +291,9 @@ NTSTATUS _app_tool_ping (
 		if (!page_list[page_id].thread)
 			break;
 
-		if (GetAddrInfoW (string->buffer, NULL, &hints, &result) == ERROR_SUCCESS)
+		status = GetAddrInfoW (string->buffer, NULL, &hints, &result);
+
+		if (status == ERROR_SUCCESS)
 		{
 			for (PADDRINFOW ptr = result; ptr; ptr = ptr->ai_next)
 			{
@@ -299,7 +301,7 @@ NTSTATUS _app_tool_ping (
 
 				length = RTL_NUMBER_OF (ipaddr);
 
-				status = WSAAddressToString (sockaddr_ip, (ULONG)ptr->ai_addrlen, NULL, ipaddr, &length);
+				status = WSAAddressToStringW (sockaddr_ip, (ULONG)ptr->ai_addrlen, NULL, ipaddr, &length);
 
 				if (status == ERROR_SUCCESS)
 				{
@@ -591,12 +593,12 @@ NTSTATUS _app_tool_downloadspeed (
 
 	status = _r_inet_openurl (hsession, url, proxy_string, &hconnect, &hrequest, NULL);
 
-	if (status == ERROR_SUCCESS)
+	if (status)
 	{
 		RtlQueryPerformanceCounter (&p1);
 		RtlQueryPerformanceCounter (&freq);
 
-		length = 0x8000;
+		length = PR_SIZE_BUFFER;
 		buff = _r_mem_allocate (length);
 
 		while (TRUE)
@@ -1202,7 +1204,7 @@ NTSTATUS _app_tool_urlinfo (
 
 	status = _r_inet_openurl (hsession, url, proxy_string, &hconnect, &hrequest, NULL);
 
-	if (status != ERROR_SUCCESS)
+	if (!status)
 	{
 		_r_show_errormessage (hwnd, NULL, PebLastError (), L"Произошла ошибка при открытии ссылки", NULL, NULL);
 	}
