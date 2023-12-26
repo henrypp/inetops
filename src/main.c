@@ -951,7 +951,7 @@ VOID _app_tool_sysinfo (
 	WCHAR buffer[128];
 	WCHAR type[256] = {0};
 	CHAR bytes[32];
-	ULONG out_length;
+	ULONG length;
 	ULONG flags = 0;
 	SOCKET sock;
 	INT item_id = 0;
@@ -995,13 +995,13 @@ VOID _app_tool_sysinfo (
 
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 
-	out_length = sizeof (FIXED_INFO);
-	network_params = _r_mem_allocate (out_length);
+	length = sizeof (FIXED_INFO) * 2;
+	network_params = _r_mem_allocate (length);
 
-	if (GetNetworkParams (network_params, &out_length) == ERROR_BUFFER_OVERFLOW)
-		_r_mem_reallocate (&network_params, out_length);
+	if (GetNetworkParams (network_params, &length) == ERROR_BUFFER_OVERFLOW)
+		_r_mem_reallocate (&network_params, length);
 
-	if (GetNetworkParams (network_params, &out_length) == NO_ERROR)
+	if (GetNetworkParams (network_params, &length) == NO_ERROR)
 	{
 		switch (network_params->NodeType)
 		{
@@ -1206,7 +1206,7 @@ NTSTATUS _app_tool_urlinfo (
 
 	if (!status)
 	{
-		_r_show_errormessage (hwnd, NULL, PebLastError (), L"Произошла ошибка при открытии ссылки", NULL, NULL);
+		_r_show_errormessage (hwnd, NULL, PebLastError (), L"Произошла ошибка при открытии ссылки", FALSE);
 	}
 	else
 	{
@@ -2059,12 +2059,12 @@ VOID _app_initializepages (
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (category_list); i++)
 	{
-		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, NULL, NULL, 0);
+		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, TVIS_EXPANDED, NULL, NULL, 0);
 	}
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (page_list); i++)
 	{
-		page_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (page_list[i].title), IL_FOLDER, category_list[page_list[i].category].hitem, NULL, (LPARAM)i);
+		page_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (page_list[i].title), IL_FOLDER, 0, category_list[page_list[i].category].hitem, NULL, (LPARAM)i);
 
 		page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCE (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
 
@@ -2932,7 +2932,7 @@ LRESULT CALLBACK DlgProc (
 
 			if (status != ERROR_SUCCESS)
 			{
-				_r_show_errormessage (hwnd, APP_NAME, status, NULL, NULL, NULL);
+				_r_show_errormessage (hwnd, APP_NAME, status, NULL, FALSE);
 
 				RtlExitUserProcess (status);
 			}
