@@ -1,5 +1,5 @@
 ﻿// InetOps
-// Copyright (c) 2012-2023 Henry++
+// Copyright (c) 2012-2024 Henry++
 
 #include "routine.h"
 
@@ -15,7 +15,6 @@
 #include <inaddr.h>
 #include <shlobj.h>
 #include <sensapi.h>
-#include <winioctl.h>
 #include <strsafe.h>
 
 #include "app.h"
@@ -43,27 +42,30 @@ VOID _app_imagelist_init (
 	_In_ LONG dpi_value
 )
 {
-	LONG icon_small;
+	LONG icon_size;
 
 	SAFE_DELETE_ICON (config.hfolder);
 	SAFE_DELETE_ICON (config.hfolder_current);
 	SAFE_DELETE_ICON (config.hsuccess);
 	SAFE_DELETE_ICON (config.hfailed);
 
-	icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
+	if (!dpi_value)
+		dpi_value = _r_dc_getwindowdpi (hwnd);
 
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER), icon_small, &config.hfolder);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER_CURRENT), icon_small, &config.hfolder_current);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_SUCCESS), icon_small, &config.hsuccess);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FAULT), icon_small, &config.hfailed);
+	icon_size = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
+
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_FOLDER), icon_size, &config.hfolder);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_FOLDER_CURRENT), icon_size, &config.hfolder_current);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_SUCCESS), icon_size, &config.hsuccess);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_FAULT), icon_size, &config.hfailed);
 
 	if (config.himglist)
 	{
-		ImageList_SetIconSize (config.himglist, icon_small, icon_small);
+		ImageList_SetIconSize (config.himglist, icon_size, icon_size);
 	}
 	else
 	{
-		config.himglist = ImageList_Create (icon_small, icon_small, ILC_COLOR32 | ILC_HIGHQUALITYSCALE, 0, 5);
+		config.himglist = ImageList_Create (icon_size, icon_size, ILC_COLOR32 | ILC_HIGHQUALITYSCALE, 0, 5);
 
 		if (config.himglist)
 		{
@@ -83,7 +85,7 @@ LONG_PTR _app_treeview_custdraw (
 )
 {
 	if (lptvcd->nmcd.hdr.idFrom != IDC_ITEMLIST)
-		return 0;
+		return CDRF_DODEFAULT;
 
 	switch (lptvcd->nmcd.dwDrawStage)
 	{
@@ -147,7 +149,7 @@ LONG_PTR _app_treeview_custdraw (
 		}
 	}
 
-	return 0;
+	return CDRF_DODEFAULT;
 }
 
 VOID _app_setpagepos (
@@ -188,10 +190,10 @@ ULONG_PTR _app_getcurrentpage (
 	HTREEITEM hitem;
 	LPARAM lparam;
 
-	hitem = (HTREEITEM)SendDlgItemMessage (hwnd, IDC_ITEMLIST, TVM_GETNEXTITEM, TVGN_CARET, 0);
+	hitem = (HTREEITEM)SendDlgItemMessageW (hwnd, IDC_ITEMLIST, TVM_GETNEXTITEM, TVGN_CARET, 0);
 
-	if (!SendDlgItemMessage (hwnd, IDC_ITEMLIST, TVM_GETNEXTITEM, TVGN_PARENT, (LPARAM)hitem))
-		hitem = (HTREEITEM)SendDlgItemMessage (hwnd, IDC_ITEMLIST, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)hitem);
+	if (!_r_treeview_getnextitem (hwnd, IDC_ITEMLIST, hitem, TVGN_PARENT))
+		hitem = _r_treeview_getnextitem (hwnd, IDC_ITEMLIST, hitem, TVGN_CHILD);
 
 	if (!hitem)
 		return 0;
@@ -215,7 +217,7 @@ VOID _app_setcurrentpage (
 	if (item_id >= PAGE_COUNT)
 		item_id = PAGE_COUNT - 1;
 
-	SendDlgItemMessage (hwnd, IDC_ITEMLIST, TVM_SELECTITEM, TVGN_CARET, (LPARAM)page_list[item_id].hitem);
+	_r_treeview_selectitem (hwnd, IDC_ITEMLIST, page_list[item_id].hitem);
 }
 
 NTSTATUS _app_tool_ping (
@@ -482,6 +484,7 @@ NTSTATUS _app_tool_externalip (
 	ULONG readed;
 	INT item_id = 0;
 	BOOLEAN result = FALSE;
+	ULONG status;
 
 	hwnd = (HWND)lparam;
 
@@ -489,16 +492,23 @@ NTSTATUS _app_tool_externalip (
 
 	_r_listview_fillitems (hwnd, IDC_IP_RESULT, -1, -1, 1, L"Loading...", I_IMAGENONE);
 
-	hsession = _r_inet_createsession (NULL);
+	proxy_string = _r_app_getproxyconfiguration ();
+
+	hsession = _r_inet_createsession (_r_app_getuseragent (), proxy_string);
 
 	if (!hsession)
+	{
+		if (proxy_string)
+			_r_obj_dereference (proxy_string);
+
 		return STATUS_NETWORK_BUSY;
+	}
 
 	address = _r_obj_createstring (IP_ADDRESS);
 
-	proxy_string = _r_app_getproxyconfiguration ();
+	status = _r_inet_openurl (hsession, address, &hconnect, &hrequest, NULL);
 
-	if (_r_inet_openurl (hsession, address, proxy_string, &hconnect, &hrequest, NULL))
+	if (status = STATUS_SUCCESS)
 	{
 		if (_r_inet_querystatuscode (hrequest) == HTTP_STATUS_OK)
 		{
@@ -584,16 +594,16 @@ NTSTATUS _app_tool_downloadspeed (
 	if (!url)
 		goto CleanupExit;
 
-	hsession = _r_inet_createsession (NULL);
+	proxy_string = _r_app_getproxyconfiguration ();
+
+	hsession = _r_inet_createsession (_r_app_getuseragent (), proxy_string);
 
 	if (!hsession)
 		goto CleanupExit;
 
-	proxy_string = _r_app_getproxyconfiguration ();
+	status = _r_inet_openurl (hsession, url, &hconnect, &hrequest, NULL);
 
-	status = _r_inet_openurl (hsession, url, proxy_string, &hconnect, &hrequest, NULL);
-
-	if (status)
+	if (status == STATUS_SUCCESS)
 	{
 		RtlQueryPerformanceCounter (&p1);
 		RtlQueryPerformanceCounter (&freq);
@@ -741,7 +751,7 @@ NTSTATUS _app_tool_whois (
 		addr.sin_addr.S_un.S_addr = ((LPIN_ADDR)host->h_addr)->s_addr;
 	}
 
-	sock = WSASocket (AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
+	sock = WSASocketW (AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
 
 	if (sock == INVALID_SOCKET)
 	{
@@ -945,12 +955,10 @@ VOID _app_tool_sysinfo (
 {
 	RTL_OSVERSIONINFOEXW version_info;
 	R_STRINGREF sr;
-	R_BYTEREF br;
 	PFIXED_INFO network_params;
 	PR_STRING username;
 	WCHAR buffer[128];
 	WCHAR type[256] = {0};
-	CHAR bytes[32];
 	ULONG length;
 	ULONG flags = 0;
 	SOCKET sock;
@@ -1078,21 +1086,8 @@ VOID _app_tool_sysinfo (
 		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 	}
 
-	gethostname (bytes, RTL_NUMBER_OF (bytes));
-
-	_r_obj_initializebyteref (&br, bytes);
-
-	status = _r_str_multibyte2unicode (&br, &username);
-
-	if (NT_SUCCESS (status))
-	{
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, username->buffer);
-
-		_r_obj_dereference (username);
-	}
-
 	flags = RTL_NUMBER_OF (buffer);
-	GetComputerNameEx (ComputerNameDnsHostname, buffer, &flags);
+	GetComputerNameExW (ComputerNameDnsHostname, buffer, &flags);
 
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 }
@@ -1132,7 +1127,7 @@ VOID _app_tool_hostaddress (
 
 			length = RTL_NUMBER_OF (ipaddr);
 
-			if (WSAAddressToString (sockaddr_ip, (ULONG)ptr->ai_addrlen, NULL, ipaddr, &length) == ERROR_SUCCESS)
+			if (WSAAddressToStringW (sockaddr_ip, (ULONG)ptr->ai_addrlen, NULL, ipaddr, &length) == ERROR_SUCCESS)
 			{
 				if (ptr->ai_family == AF_INET)
 				{
@@ -1192,21 +1187,25 @@ NTSTATUS _app_tool_urlinfo (
 
 	url = _r_ctrl_getstring (hwnd, IDC_URLINFO_LINK);
 
-	hsession = _r_inet_createsession (NULL);
+	proxy_string = _r_app_getproxyconfiguration ();
+
+	hsession = _r_inet_createsession (_r_app_getuseragent (), proxy_string);
 
 	if (!hsession)
-		return 0;
+	{
+		_r_show_errormessage (hwnd, NULL, PebLastError (), L"Произошла ошибка при создания сессии", FALSE);
+
+		return STATUS_SUCCESS;
+	}
 
 	_r_ctrl_enable (hwnd, IDC_URLINFO_START, FALSE);
 	_r_ctrl_enable (hwnd, IDC_URLINFO_CLEAR, FALSE);
 
-	proxy_string = _r_app_getproxyconfiguration ();
+	status = _r_inet_openurl (hsession, url, &hconnect, &hrequest, NULL);
 
-	status = _r_inet_openurl (hsession, url, proxy_string, &hconnect, &hrequest, NULL);
-
-	if (!status)
+	if (status != STATUS_SUCCESS)
 	{
-		_r_show_errormessage (hwnd, NULL, PebLastError (), L"Произошла ошибка при открытии ссылки", FALSE);
+		_r_show_errormessage (hwnd, NULL, status, L"Произошла ошибка при открытии ссылки", FALSE);
 	}
 	else
 	{
@@ -1254,6 +1253,10 @@ NTSTATUS _app_tool_urlinfo (
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_CONTENT_TYPE, &buffer, &length))
 	{
 		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
+	}
+	else
+	{
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
 	}
 
 	length = sizeof (buffer);
@@ -2059,14 +2062,23 @@ VOID _app_initializepages (
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (category_list); i++)
 	{
-		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, TVIS_EXPANDED, NULL, NULL, 0);
+		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, TVIS_EXPANDED, NULL, NULL, -1);
 	}
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (page_list); i++)
 	{
-		page_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (page_list[i].title), IL_FOLDER, 0, category_list[page_list[i].category].hitem, NULL, (LPARAM)i);
+		page_list[i].hitem = _r_treeview_additem (
+			hwnd,
+			IDC_ITEMLIST,
+			_r_locale_getstring (page_list[i].title),
+			IL_FOLDER,
+			0,
+			category_list[page_list[i].category].hitem,
+			NULL,
+			(LPARAM)i
+		);
 
-		page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCE (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
+		page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCEW (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
 
 		if (page_list[i].hpage)
 			_app_setpagepos (hwnd, page_list[i].hpage);
@@ -2088,7 +2100,7 @@ VOID _app_initializepage (
 	{
 		case IDD_PAGE_PING:
 		{
-			SendDlgItemMessage (hwnd, IDC_PING_UPDOWN, UDM_SETRANGE32, 1, 1000);
+			SendDlgItemMessageW (hwnd, IDC_PING_UPDOWN, UDM_SETRANGE32, 1, 1000);
 
 			_r_ctrl_setstring (hwnd, IDC_PING_HOST, _r_obj_getstring (_r_config_getstring (L"PingAddress", APP_HOST)));
 
@@ -2135,7 +2147,7 @@ VOID _app_initializepage (
 
 			_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_LINK, _r_obj_getstring (_r_config_getstring (L"SpeedmeterLink", APP_HOST)));
 
-			SendDlgItemMessage (hwnd, IDC_SPEEDMETER_UPDOWN, UDM_SETRANGE32, 0, 1000);
+			SendDlgItemMessageW (hwnd, IDC_SPEEDMETER_UPDOWN, UDM_SETRANGE32, 0, 1000);
 
 			SetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, _r_config_getlong (L"SpeedMeterLimit", 10), TRUE);
 
@@ -2177,7 +2189,7 @@ VOID _app_initializepage (
 			_r_ctrl_setstring (hwnd, IDC_WHOIS_HOST, _r_obj_getstring (_r_config_getstring (L"WhoisAddress", APP_HOST)));
 
 			for (ULONG_PTR i = 0; i < WHOIS_COUNT; i++)
-				SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_ADDSTRING, 0, (LPARAM)whois_servers[i].server);
+				SendDlgItemMessageW (hwnd, IDC_WHOIS_SERVER, CB_ADDSTRING, 0, (LPARAM)whois_servers[i].server);
 
 			item_id = _r_config_getlong (L"WhoisServer", 0);
 
@@ -2187,7 +2199,7 @@ VOID _app_initializepage (
 			}
 			else
 			{
-				SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_SETCURSEL, item_id, 0);
+				SendDlgItemMessageW (hwnd, IDC_WHOIS_SERVER, CB_SETCURSEL, item_id, 0);
 			}
 
 			break;
@@ -2222,7 +2234,7 @@ VOID _app_initializepage (
 			_r_ctrl_setstring (hwnd, IDC_URLINFO_LINK, _r_obj_getstring (_r_config_getstring (L"UrlInfoLink", APP_HOST)));
 			_r_ctrl_checkbutton (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE));
 
-			PostMessage (hwnd, WM_COMMAND, MAKELPARAM (IDC_URLINFO_HEADER_CHK, 0), 0);
+			PostMessageW (hwnd, WM_COMMAND, MAKELPARAM (IDC_URLINFO_HEADER_CHK, 0), 0);
 
 			break;
 		}
@@ -2252,7 +2264,7 @@ VOID _app_initializepage (
 
 			_r_ctrl_checkbutton (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE));
 
-			PostMessage (hwnd, WM_COMMAND, MAKELPARAM (IDC_IP_REFRESH, 0), 0);
+			PostMessageW (hwnd, WM_COMMAND, MAKELPARAM (IDC_IP_REFRESH, 0), 0);
 
 			break;
 		}
@@ -2268,7 +2280,7 @@ VOID _app_initializepage (
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 2, L"Type", 190, 0);
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 3, L"Connected", 190, 0);
 
-			PostMessage (hwnd, WM_COMMAND, MAKELPARAM (IDC_SHAREDINFO_START, 0), 0);
+			PostMessageW (hwnd, WM_COMMAND, MAKELPARAM (IDC_SHAREDINFO_START, 0), 0);
 
 			break;
 		}
@@ -2534,52 +2546,52 @@ INT_PTR WINAPI PageDlgProc (
 		{
 			WCHAR buffer[256] = {0};
 			LONG item_id;
-			BOOL status = FALSE;
+			BOOL is_translated;
 
 			if (GetDlgItem (hwnd, IDC_PING_HOST))
 			{
-				GetDlgItemText (hwnd, IDC_PING_HOST, buffer, RTL_NUMBER_OF (buffer));
+				GetDlgItemTextW (hwnd, IDC_PING_HOST, buffer, RTL_NUMBER_OF (buffer));
 
 				_r_config_setstring (L"PingAddress", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_PING_RETRIES))
 			{
-				item_id = GetDlgItemInt (hwnd, IDC_PING_RETRIES, &status, TRUE);
+				item_id = GetDlgItemInt (hwnd, IDC_PING_RETRIES, &is_translated, TRUE);
 
-				if (status)
+				if (is_translated)
 					_r_config_setlong (L"PingRetries", item_id);
 			}
 
 			if (GetDlgItem (hwnd, IDC_SPEEDMETER_LINK))
 			{
-				item_id = GetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, &status, TRUE);
+				item_id = GetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, &is_translated, TRUE);
 
-				if (status)
+				if (is_translated)
 					_r_config_setlong (L"SpeedMeterLimit", item_id);
 
-				GetDlgItemText (hwnd, IDC_SPEEDMETER_LINK, buffer, RTL_NUMBER_OF (buffer));
+				GetDlgItemTextW (hwnd, IDC_SPEEDMETER_LINK, buffer, RTL_NUMBER_OF (buffer));
 
 				_r_config_setstring (L"SpeedmeterLink", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLDECODER_LINK))
 			{
-				GetDlgItemText (hwnd, IDC_URLDECODER_LINK, buffer, RTL_NUMBER_OF (buffer));
+				GetDlgItemTextW (hwnd, IDC_URLDECODER_LINK, buffer, RTL_NUMBER_OF (buffer));
 
 				_r_config_setstring (L"UrlDecoderLink", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_HOSTADDR_HOST))
 			{
-				GetDlgItemText (hwnd, IDC_HOSTADDR_HOST, buffer, RTL_NUMBER_OF (buffer));
+				GetDlgItemTextW (hwnd, IDC_HOSTADDR_HOST, buffer, RTL_NUMBER_OF (buffer));
 
 				_r_config_setstring (L"HostAddrAddress", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLINFO_LINK))
 			{
-				GetDlgItemText (hwnd, IDC_URLINFO_LINK, buffer, RTL_NUMBER_OF (buffer));
+				GetDlgItemTextW (hwnd, IDC_URLINFO_LINK, buffer, RTL_NUMBER_OF (buffer));
 
 				_r_config_setstring (L"UrlInfoLink", buffer);
 			}
@@ -2592,18 +2604,19 @@ INT_PTR WINAPI PageDlgProc (
 
 			if (GetDlgItem (hwnd, IDC_WHOIS_HOST))
 			{
-				GetDlgItemText (hwnd, IDC_WHOIS_HOST, buffer, RTL_NUMBER_OF (buffer));
+				GetDlgItemTextW (hwnd, IDC_WHOIS_HOST, buffer, RTL_NUMBER_OF (buffer));
 
 				_r_config_setstring (L"WhoisAddress", buffer);
 			}
 
 			if (GetDlgItem (hwnd, IDC_WHOIS_SERVER))
 			{
-				item_id = (LONG)SendDlgItemMessage (hwnd, IDC_WHOIS_SERVER, CB_GETCURSEL, 0, 0);
+				item_id = _r_combobox_getcurrentitem (hwnd, IDC_WHOIS_SERVER);
 
 				if (item_id == CB_ERR)
 				{
-					GetDlgItemText (hwnd, IDC_WHOIS_SERVER, buffer, RTL_NUMBER_OF (buffer));
+					GetDlgItemTextW (hwnd, IDC_WHOIS_SERVER, buffer, RTL_NUMBER_OF (buffer));
+
 					_r_config_setstring (L"WhoisServerCustom", buffer);
 				}
 
@@ -2624,7 +2637,7 @@ INT_PTR WINAPI PageDlgProc (
 			if (!page_list[page_id].listview_id)
 				break;
 
-			hmenu = LoadMenu (NULL, MAKEINTRESOURCE (IDM_LISTVIEW));
+			hmenu = LoadMenuW (NULL, MAKEINTRESOURCEW (IDM_LISTVIEW));
 			hsubmenu = GetSubMenu (hmenu, 0);
 
 			//if (!_r_listview_getitemcount (page_list[page_id].hpage, page_list[page_id].listview_id))
@@ -2640,7 +2653,7 @@ INT_PTR WINAPI PageDlgProc (
 			//	_r_menu_enableitem (hsubmenu, IDC_LISTVIEW_COPY_VALUE, 0, FALSE);
 			//}
 
-			//if (PostMessage ((HWND)PostMessage ((HWND)wparam, LVM_GETHEADER, 0, 0), HDM_GETITEMCOUNT, 0, 0) != 2)
+			//if (PostMessageW ((HWND)PostMessageW ((HWND)wparam, LVM_GETHEADER, 0, 0), HDM_GETITEMCOUNT, 0, 0) != 2)
 			//	_r_menu_enableitem (hsubmenu, IDC_LISTVIEW_COPY_VALUE, 0, FALSE);
 
 			_r_menu_popup (hsubmenu, hwnd, NULL, TRUE);
@@ -2932,7 +2945,7 @@ LRESULT CALLBACK DlgProc (
 
 			if (status != ERROR_SUCCESS)
 			{
-				_r_show_errormessage (hwnd, APP_NAME, status, NULL, FALSE);
+				_r_show_errormessage (hwnd, NULL, status, NULL, FALSE);
 
 				RtlExitUserProcess (status);
 			}
@@ -3054,19 +3067,14 @@ LRESULT CALLBACK DlgProc (
 
 			_app_imagelist_init (hwnd, LOWORD (wparam));
 
-			SendMessage (hwnd, WM_SIZE, 0, 0);
+			SendMessageW (hwnd, WM_SIZE, 0, 0);
 
 			break;
 		}
 
 		case WM_THEMECHANGED:
 		{
-			LONG dpi_value;
-
-			dpi_value = _r_dc_getwindowdpi (hwnd);
-
-			SendMessage (hwnd, WM_SIZE, 0, 0);
-
+			SendMessageW (hwnd, WM_SIZE, 0, 0);
 			break;
 		}
 
@@ -3076,56 +3084,39 @@ LRESULT CALLBACK DlgProc (
 
 			switch (lphdr->code)
 			{
-				case TVN_SELCHANGING:
-				{
-					LPNMTREEVIEW pnmtv;
-					TVITEMEX tvi = {0};
-					LONG_PTR page_id;
-
-					if (wparam != IDC_ITEMLIST)
-						break;
-
-					pnmtv = (LPNMTREEVIEW)lparam;
-
-					page_id = pnmtv->itemOld.lParam;
-
-					if (page_id == -1)
-					{
-						tvi.hItem = (HTREEITEM)SendMessage (pnmtv->hdr.hwndFrom, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)pnmtv->itemNew.hItem);
-						tvi.mask = TVIF_HANDLE;
-
-						SendMessage (pnmtv->hdr.hwndFrom, TVM_GETITEM, 0, (LPARAM)&tvi);
-						SendMessage (pnmtv->hdr.hwndFrom, TVM_SELECTITEM, TVGN_CARET, (LPARAM)tvi.hItem);
-
-						break;
-					}
-
-					if (page_list[page_id].hpage)
-						ShowWindow (page_list[page_id].hpage, SW_HIDE);
-
-					break;
-				}
-
 				case TVN_SELCHANGED:
 				{
-					LPNMTREEVIEW pnmtv = (LPNMTREEVIEW)lparam;
-					ULONG_PTR page_id;
+					ULONG_PTR page_id_old;
+					ULONG_PTR page_id_new;
+					LPNMTREEVIEWW lpnmtv;
 
 					if (wparam != IDC_ITEMLIST)
 						break;
 
-					page_id = pnmtv->itemNew.lParam;
+					lpnmtv = (LPNMTREEVIEWW)lparam;
 
-					if (page_list[page_id].hpage)
-						ShowWindow (page_list[page_id].hpage, SW_SHOW);
+					page_id_old = lpnmtv->itemOld.lParam;
+					page_id_new = lpnmtv->itemNew.lParam;
 
-					if (!page_list[page_id].hpage)
-						break;
+					if (page_list[page_id_old].hpage)
+						ShowWindow (page_list[page_id_old].hpage, SW_HIDE);
 
-					_app_setpagepos (hwnd, page_list[page_id].hpage);
+					if (page_id_new == -1)
+					{
+						_r_treeview_selectfirstchild (hwnd, IDC_ITEMLIST, lpnmtv->itemNew.hItem);
 
-					_r_status_settext (hwnd, IDC_STATUSBAR, 0, _r_locale_getstring (page_list[page_id].title));
-					_r_status_settext (hwnd, IDC_STATUSBAR, 1, _r_locale_getstring (page_list[page_id].description));
+						return 0;
+					}
+
+					if (page_list[page_id_new].hpage)
+					{
+						_app_setpagepos (hwnd, page_list[page_id_new].hpage);
+
+						ShowWindow (page_list[page_id_new].hpage, SW_SHOW);
+					}
+
+					_r_status_settext (hwnd, IDC_STATUSBAR, 0, _r_locale_getstring (page_list[page_id_new].title));
+					_r_status_settext (hwnd, IDC_STATUSBAR, 1, _r_locale_getstring (page_list[page_id_new].description));
 
 					break;
 				}
@@ -3136,7 +3127,8 @@ LRESULT CALLBACK DlgProc (
 
 					result = _app_treeview_custdraw (hwnd, (LPNMTVCUSTOMDRAW)lparam);
 
-					SetWindowLongPtr (hwnd, DWLP_MSGRESULT, result);
+					SetWindowLongPtrW (hwnd, DWLP_MSGRESULT, result);
+
 					return result;
 				}
 			}
@@ -3175,13 +3167,7 @@ LRESULT CALLBACK DlgProc (
 				case IDCANCEL: // process Esc key
 				case IDM_EXIT:
 				{
-					PostMessage (hwnd, WM_CLOSE, 0, 0);
-					break;
-				}
-
-				case IDM_ZOOM:
-				{
-					ShowWindow (hwnd, IsZoomed (hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+					DestroyWindow (hwnd);
 					break;
 				}
 
@@ -3228,6 +3214,12 @@ LRESULT CALLBACK DlgProc (
 					_r_show_aboutmessage (hwnd);
 					break;
 				}
+
+				case IDM_ZOOM:
+				{
+					ShowWindow (hwnd, IsZoomed (hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+					break;
+				}
 			}
 
 			break;
@@ -3249,15 +3241,10 @@ INT APIENTRY wWinMain (
 	if (!_r_app_initialize (NULL))
 		return ERROR_APP_INIT_FAILURE;
 
-	hwnd = _r_app_createwindow (
-		hinst,
-		MAKEINTRESOURCE (IDD_MAIN),
-		MAKEINTRESOURCE (IDI_MAIN),
-		&DlgProc
-	);
+	hwnd = _r_app_createwindow (hinst, MAKEINTRESOURCEW (IDD_MAIN), MAKEINTRESOURCEW (IDI_MAIN), &DlgProc);
 
 	if (!hwnd)
 		return ERROR_APP_INIT_FAILURE;
 
-	return _r_wnd_message_callback (hwnd, MAKEINTRESOURCE (IDA_MAIN));
+	return _r_wnd_message_callback (hwnd, MAKEINTRESOURCEW (IDA_MAIN));
 }
