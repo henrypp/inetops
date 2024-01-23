@@ -2100,7 +2100,7 @@ VOID _app_initializepage (
 	{
 		case IDD_PAGE_PING:
 		{
-			SendDlgItemMessageW (hwnd, IDC_PING_UPDOWN, UDM_SETRANGE32, 1, 1000);
+			_r_wnd_sendmessage (hwnd, IDC_PING_UPDOWN, UDM_SETRANGE32, 1, 1000);
 
 			_r_ctrl_setstring (hwnd, IDC_PING_HOST, _r_obj_getstring (_r_config_getstring (L"PingAddress", APP_HOST)));
 
@@ -2147,7 +2147,7 @@ VOID _app_initializepage (
 
 			_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_LINK, _r_obj_getstring (_r_config_getstring (L"SpeedmeterLink", APP_HOST)));
 
-			SendDlgItemMessageW (hwnd, IDC_SPEEDMETER_UPDOWN, UDM_SETRANGE32, 0, 1000);
+			_r_wnd_sendmessage (hwnd, IDC_SPEEDMETER_UPDOWN, UDM_SETRANGE32, 0, 1000);
 
 			SetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, _r_config_getlong (L"SpeedMeterLimit", 10), TRUE);
 
@@ -2189,7 +2189,7 @@ VOID _app_initializepage (
 			_r_ctrl_setstring (hwnd, IDC_WHOIS_HOST, _r_obj_getstring (_r_config_getstring (L"WhoisAddress", APP_HOST)));
 
 			for (ULONG_PTR i = 0; i < WHOIS_COUNT; i++)
-				SendDlgItemMessageW (hwnd, IDC_WHOIS_SERVER, CB_ADDSTRING, 0, (LPARAM)whois_servers[i].server);
+				_r_combobox_insertitem (hwnd, IDC_WHOIS_SERVER, (INT)i, whois_servers[i].server, 0);
 
 			item_id = _r_config_getlong (L"WhoisServer", 0);
 
@@ -2199,7 +2199,7 @@ VOID _app_initializepage (
 			}
 			else
 			{
-				SendDlgItemMessageW (hwnd, IDC_WHOIS_SERVER, CB_SETCURSEL, item_id, 0);
+				_r_combobox_setcurrentitem (hwnd, IDC_WHOIS_SERVER, item_id);
 			}
 
 			break;
@@ -2234,7 +2234,7 @@ VOID _app_initializepage (
 			_r_ctrl_setstring (hwnd, IDC_URLINFO_LINK, _r_obj_getstring (_r_config_getstring (L"UrlInfoLink", APP_HOST)));
 			_r_ctrl_checkbutton (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE));
 
-			PostMessageW (hwnd, WM_COMMAND, MAKELPARAM (IDC_URLINFO_HEADER_CHK, 0), 0);
+			_r_wnd_sendmessage (hwnd, 0, WM_COMMAND, MAKELPARAM (IDC_URLINFO_HEADER_CHK, 0), 0);
 
 			break;
 		}
@@ -2264,7 +2264,7 @@ VOID _app_initializepage (
 
 			_r_ctrl_checkbutton (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE));
 
-			PostMessageW (hwnd, WM_COMMAND, MAKELPARAM (IDC_IP_REFRESH, 0), 0);
+			_r_wnd_sendmessage (hwnd, 0, WM_COMMAND, MAKELPARAM (IDC_IP_REFRESH, 0), 0);
 
 			break;
 		}
@@ -2280,7 +2280,7 @@ VOID _app_initializepage (
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 2, L"Type", 190, 0);
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 3, L"Connected", 190, 0);
 
-			PostMessageW (hwnd, WM_COMMAND, MAKELPARAM (IDC_SHAREDINFO_START, 0), 0);
+			_r_wnd_sendmessage (hwnd, 0, WM_COMMAND, MAKELPARAM (IDC_SHAREDINFO_START, 0), 0);
 
 			break;
 		}
@@ -3067,14 +3067,14 @@ LRESULT CALLBACK DlgProc (
 
 			_app_imagelist_init (hwnd, LOWORD (wparam));
 
-			SendMessageW (hwnd, WM_SIZE, 0, 0);
+			_r_wnd_sendmessage (hwnd, 0, WM_SIZE, 0, 0);
 
 			break;
 		}
 
 		case WM_THEMECHANGED:
 		{
-			SendMessageW (hwnd, WM_SIZE, 0, 0);
+			_r_wnd_sendmessage (hwnd, 0, WM_SIZE, 0, 0);
 			break;
 		}
 
