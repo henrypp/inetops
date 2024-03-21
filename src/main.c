@@ -84,9 +84,6 @@ LONG_PTR _app_treeview_custdraw (
 	_In_ LPNMTVCUSTOMDRAW lptvcd
 )
 {
-	if (lptvcd->nmcd.hdr.idFrom != IDC_ITEMLIST)
-		return CDRF_DODEFAULT;
-
 	switch (lptvcd->nmcd.dwDrawStage)
 	{
 		case CDDS_PREPAINT:
@@ -99,26 +96,24 @@ LONG_PTR _app_treeview_custdraw (
 			HFONT hfont;
 			COLORREF text_clr;
 			ULONG weight = 0;
-			ULONG underline = 0;
-
-			text_clr = GetSysColor (COLOR_GRAYTEXT);
 
 			if (!lptvcd->iLevel)
 			{
 				weight = FW_BOLD;
-				text_clr = RGB (0, 0, 0);
+				text_clr = _r_theme_isenabled () ? WND_TEXT_CLR : RGB (0, 0, 0);
+			}
+			else
+			{
+				text_clr = _r_theme_isenabled () ? WND_TEXT_CLR : GetSysColor (COLOR_GRAYTEXT);
 			}
 
 			if (lptvcd->nmcd.uItemState & CDIS_HOT)
 			{
-				text_clr = RGB (0, 78, 152);
-				underline = 1;
-				lptvcd->clrTextBk = RGB (216, 231, 239);
+				lptvcd->clrTextBk = GetSysColor (COLOR_HIGHLIGHT);
 			}
 
 			if (lptvcd->nmcd.uItemState & CDIS_SELECTED)
 			{
-				text_clr = RGB (0, 0, 0);
 				lptvcd->clrTextBk = RGB (171, 208, 228);
 			}
 
@@ -129,7 +124,7 @@ LONG_PTR _app_treeview_custdraw (
 				0,
 				weight,
 				0,
-				underline,
+				0,
 				0,
 				DEFAULT_CHARSET,
 				OUT_CHARACTER_PRECIS,
@@ -755,7 +750,7 @@ NTSTATUS _app_tool_whois (
 
 	if (sock == INVALID_SOCKET)
 	{
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling socket() error: %d", PebLastError ());
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling socket() error: %d", NtLastError ());
 		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
 
 		goto CleanupExit;
@@ -763,7 +758,7 @@ NTSTATUS _app_tool_whois (
 
 	if (WSAConnect (sock, (PSOCKADDR)&addr, sizeof (SOCKADDR_IN), NULL, NULL, NULL, NULL) == SOCKET_ERROR)
 	{
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling WSAConnect() error: %d", PebLastError ());
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling WSAConnect() error: %d", NtLastError ());
 		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
 
 		goto CleanupExit;
@@ -778,7 +773,7 @@ NTSTATUS _app_tool_whois (
 
 	if (status == SOCKET_ERROR)
 	{
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling WSASend() error: %d", PebLastError ());
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Calling WSASend() error: %d", NtLastError ());
 		_r_ctrl_setstring (hwnd, IDC_WHOIS_RESULT, buffer);
 
 		goto CleanupExit;
@@ -1061,12 +1056,12 @@ VOID _app_tool_sysinfo (
 
 	sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); // IPv4
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
 	closesocket (sock);
 
 	sock = socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP); // IPv6
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (PebLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
 	closesocket (sock);
 
 	_r_obj_initializestringref (&sr, L"%USERNAME%");
@@ -1150,7 +1145,7 @@ VOID _app_tool_hostaddress (
 	}
 	else
 	{
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Can't get IP of host (0x%08x)", PebLastError ());
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Can't get IP of host (0x%08x)", NtLastError ());
 	}
 
 	FreeAddrInfoW (result);
@@ -1193,7 +1188,7 @@ NTSTATUS _app_tool_urlinfo (
 
 	if (!hsession)
 	{
-		_r_show_errormessage (hwnd, NULL, PebLastError (), L"Произошла ошибка при создания сессии", FALSE);
+		_r_show_errormessage (hwnd, NULL, NtLastError (), L"Произошла ошибка при создания сессии", FALSE);
 
 		return STATUS_SUCCESS;
 	}
@@ -2959,6 +2954,7 @@ LRESULT CALLBACK DlgProc (
 			if (hmenu)
 			{
 				_r_menu_checkitem (hmenu, IDM_ALWAYSONTOP_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"AlwaysOnTop", FALSE));
+				_r_menu_checkitem (hmenu, IDM_DARKMODE_CHK, 0, MF_BYCOMMAND, _r_theme_isenabled ());
 				_r_menu_checkitem (hmenu, IDM_CHECKUPDATES_CHK, 0, MF_BYCOMMAND, _r_update_isenabled (FALSE));
 
 				hsubmenu = GetSubMenu (hmenu, 1);
@@ -3014,6 +3010,7 @@ LRESULT CALLBACK DlgProc (
 
 			_r_menu_setitemtextformat (hmenu, IDM_EXIT, FALSE, L"%s\tEsc", _r_locale_getstring (IDS_EXIT));
 			_r_menu_setitemtext (hmenu, IDM_ALWAYSONTOP_CHK, FALSE, _r_locale_getstring (IDS_ALWAYSONTOP_CHK));
+			_r_menu_setitemtext (hmenu, IDM_DARKMODE_CHK, FALSE, _r_locale_getstring (IDS_DARKMODE_CHK));
 			_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_CHECKUPDATES_CHK));
 			_r_menu_setitemtext (hmenu, IDM_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
 			_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES, FALSE, _r_locale_getstring (IDS_CHECKUPDATES));
@@ -3123,9 +3120,15 @@ LRESULT CALLBACK DlgProc (
 
 				case NM_CUSTOMDRAW:
 				{
+					LPNMTVCUSTOMDRAW lptvcd;
 					LONG_PTR result;
 
-					result = _app_treeview_custdraw (hwnd, (LPNMTVCUSTOMDRAW)lparam);
+					lptvcd = (LPNMTVCUSTOMDRAW)lparam;
+
+					if (lptvcd->nmcd.hdr.idFrom != IDC_ITEMLIST)
+						return CDRF_DODEFAULT;
+
+					result = _app_treeview_custdraw (hwnd, lptvcd);
 
 					SetWindowLongPtrW (hwnd, DWLP_MSGRESULT, result);
 
@@ -3181,6 +3184,19 @@ LRESULT CALLBACK DlgProc (
 					_r_config_setboolean (L"AlwaysOnTop", new_val);
 
 					_r_wnd_top (hwnd, new_val);
+
+					break;
+				}
+
+				case IDM_DARKMODE_CHK:
+				{
+					BOOLEAN new_val;
+
+					new_val = !_r_theme_isenabled ();
+
+					_r_theme_enable (hwnd, new_val);
+
+					_r_menu_checkitem (GetMenu (hwnd), ctrl_id, 0, MF_BYCOMMAND, new_val);
 
 					break;
 				}
