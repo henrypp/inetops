@@ -501,7 +501,7 @@ NTSTATUS _app_tool_externalip (
 
 	address = _r_obj_createstring (IP_ADDRESS);
 
-	status = _r_inet_openurl (hsession, address, &hconnect, &hrequest, NULL);
+	status = _r_inet_openurl (hsession, &address->sr, &hconnect, &hrequest, NULL);
 
 	if (status = STATUS_SUCCESS)
 	{
@@ -596,7 +596,7 @@ NTSTATUS _app_tool_downloadspeed (
 	if (!hsession)
 		goto CleanupExit;
 
-	status = _r_inet_openurl (hsession, url, &hconnect, &hrequest, NULL);
+	status = _r_inet_openurl (hsession, &url->sr, &hconnect, &hrequest, NULL);
 
 	if (status == STATUS_SUCCESS)
 	{
@@ -797,7 +797,7 @@ NTSTATUS _app_tool_whois (
 
 		if (NT_SUCCESS (status))
 		{
-			_r_obj_appendstringbuilder2 (&str, string);
+			_r_obj_appendstringbuilder2 (&str, &string->sr);
 
 			_r_obj_dereference (string);
 		}
@@ -1196,7 +1196,7 @@ NTSTATUS _app_tool_urlinfo (
 	_r_ctrl_enable (hwnd, IDC_URLINFO_START, FALSE);
 	_r_ctrl_enable (hwnd, IDC_URLINFO_CLEAR, FALSE);
 
-	status = _r_inet_openurl (hsession, url, &hconnect, &hrequest, NULL);
+	status = _r_inet_openurl (hsession, &url->sr, &hconnect, &hrequest, NULL);
 
 	if (status != STATUS_SUCCESS)
 	{
