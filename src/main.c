@@ -882,7 +882,7 @@ VOID _app_getsharedtype (
 	if (type & STYPE_TEMPORARY)
 		_r_str_append (buffer, buffer_size, L"Temporary share, ");
 
-	_r_str_trim (buffer, L", ");
+	StrTrimW (buffer, L", ");
 
 	if (!buffer[0])
 		_r_str_printf (buffer, buffer_size, SZ_HEX, type);
@@ -949,9 +949,8 @@ VOID _app_tool_sysinfo (
 )
 {
 	RTL_OSVERSIONINFOEXW version_info;
-	R_STRINGREF sr;
 	PFIXED_INFO network_params;
-	PR_STRING username;
+	PR_STRING string;
 	WCHAR buffer[128];
 	WCHAR type[256] = {0};
 	ULONG length;
@@ -961,6 +960,7 @@ VOID _app_tool_sysinfo (
 	NTSTATUS status;
 
 	_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d.%d", LOBYTE (wsa.wVersion), HIBYTE (wsa.wVersion));
+
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 
 	status = RtlGetVersion (&version_info);
@@ -987,7 +987,7 @@ VOID _app_tool_sysinfo (
 		if (flags & NETWORK_ALIVE_WAN)
 			_r_str_append (type, RTL_NUMBER_OF (type), L"WAN, ");
 
-		_r_str_trim (type, L", ");
+		StrTrimW (type, L", ");
 
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Enabled (%s)", type);
 	}
@@ -1004,7 +1004,7 @@ VOID _app_tool_sysinfo (
 	if (GetNetworkParams (network_params, &length) == ERROR_BUFFER_OVERFLOW)
 		_r_mem_reallocate (&network_params, length);
 
-	if (GetNetworkParams (network_params, &length) == NO_ERROR)
+	if (GetNetworkParams (network_params, &length) == ERROR_SUCCESS)
 	{
 		switch (network_params->NodeType)
 		{
@@ -1060,31 +1060,40 @@ VOID _app_tool_sysinfo (
 	closesocket (sock);
 
 	sock = socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP); // IPv6
+	//sock = WSASocketW (AF_INET6, SOCK_STREAM, IPPROTO_TCP); // IPv6
 
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
 	closesocket (sock);
 
-	_r_obj_initializestringref (&sr, L"%USERNAME%");
-
-	status = _r_str_environmentexpandstring (&sr, &username);
+	status = _r_sys_getusername (_r_sys_getcurrenttoken ()->token_sid, FALSE, &string);
 
 	if (NT_SUCCESS (status))
 	{
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, username->buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, string->buffer);
 
-		_r_obj_dereference (username);
+		_r_obj_dereference (string);
 	}
 	else
 	{
-		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error (0x%08x)", status);
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error (0x%08X)", status);
 
 		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
 	}
 
-	flags = RTL_NUMBER_OF (buffer);
-	GetComputerNameExW (ComputerNameDnsHostname, buffer, &flags);
+	status = _r_sys_getcomputername (&string);
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+	if (NT_SUCCESS (status))
+	{
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, string->buffer);
+
+		_r_obj_dereference (string);
+	}
+	else
+	{
+		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error (0x%08X)", status);
+
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+	}
 }
 
 VOID _app_tool_hostaddress (
@@ -1258,7 +1267,7 @@ NTSTATUS _app_tool_urlinfo (
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_ETAG, &buffer, &length))
 	{
-		_r_str_trim (buffer, L"\""); // Strip Quotes
+		StrTrimW (buffer, L"\""); // Strip Quotes
 
 		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
 	}
@@ -2311,7 +2320,6 @@ VOID _app_initializepage (
 			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"IPv6", IL_SUCCESS, 2, 0);
 
 			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"User name", IL_SUCCESS, 3, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Host name", IL_SUCCESS, 3, 0);
 			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Computer name", IL_SUCCESS, 3, 0);
 
 			_app_tool_sysinfo (hwnd);
