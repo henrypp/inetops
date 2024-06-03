@@ -2815,7 +2815,7 @@ INT_PTR WINAPI PageDlgProc (
 					}
 					else
 					{
-						_r_sys_createthread (&_app_tool_ping, hwnd, NULL, NULL, L"Ping");
+						_r_sys_createthread (NtCurrentProcess (), &_app_tool_ping, hwnd, NULL, NULL, L"Ping");
 					}
 
 					break;
@@ -2834,7 +2834,7 @@ INT_PTR WINAPI PageDlgProc (
 					}
 					else
 					{
-						_r_sys_createthread (&_app_tool_downloadspeed, hwnd, NULL, NULL, L"DownloadSpeed");
+						_r_sys_createthread (NtCurrentProcess (), &_app_tool_downloadspeed, hwnd, NULL, NULL, L"DownloadSpeed");
 					}
 
 					break;
@@ -2854,7 +2854,7 @@ INT_PTR WINAPI PageDlgProc (
 
 				case IDC_URLINFO_START:
 				{
-					_r_sys_createthread (&_app_tool_urlinfo, hwnd, NULL, NULL, L"UrlInfo");
+					_r_sys_createthread (NtCurrentProcess (), &_app_tool_urlinfo, hwnd, NULL, NULL, L"UrlInfo");
 					break;
 				}
 
@@ -2874,7 +2874,7 @@ INT_PTR WINAPI PageDlgProc (
 				{
 					if (_r_ctrl_isbuttonchecked (hwnd, IDC_IP_EXTERNAL_CHK))
 					{
-						_r_sys_createthread (&_app_tool_externalip, hwnd, NULL, NULL, L"ExternalIp");
+						_r_sys_createthread (NtCurrentProcess (), &_app_tool_externalip, hwnd, NULL, NULL, L"ExternalIp");
 					}
 					else
 					{
@@ -2886,7 +2886,7 @@ INT_PTR WINAPI PageDlgProc (
 
 				case IDC_WHOIS_START:
 				{
-					_r_sys_createthread (&_app_tool_whois, hwnd, NULL, NULL, L"Whois");
+					_r_sys_createthread (NtCurrentProcess (), &_app_tool_whois, hwnd, NULL, NULL, L"Whois");
 					break;
 				}
 
