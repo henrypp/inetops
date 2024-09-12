@@ -2066,7 +2066,7 @@ VOID _app_initializepages (
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (category_list); i++)
 	{
-		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, TVIS_EXPANDED, NULL, NULL, -1);
+		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, TVIS_EXPANDED, NULL, -1);
 	}
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (page_list); i++)
@@ -2078,7 +2078,6 @@ VOID _app_initializepages (
 			IL_FOLDER,
 			0,
 			category_list[page_list[i].category].hitem,
-			NULL,
 			(LPARAM)i
 		);
 
@@ -3063,6 +3062,12 @@ LRESULT CALLBACK DlgProc (
 		case WM_SIZE:
 		{
 			_r_layout_resize (&layout_manager, wparam);
+			break;
+		}
+
+		case WM_GETMINMAXINFO:
+		{
+			_r_layout_resizeminimumsize (&layout_manager, lparam);
 			break;
 		}
 
