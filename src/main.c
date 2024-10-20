@@ -1,5 +1,5 @@
 ﻿// InetOps
-// Copyright (c) 2012-2024 Henry++
+// Copyright (c) 2012-2025 Henry++
 
 #include "routine.h"
 
