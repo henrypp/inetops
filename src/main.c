@@ -43,6 +43,7 @@ VOID _app_imagelist_init (
 )
 {
 	LONG icon_size;
+	HRESULT status;
 
 	SAFE_DELETE_ICON (config.hfolder);
 	SAFE_DELETE_ICON (config.hfolder_current);
@@ -54,25 +55,25 @@ VOID _app_imagelist_init (
 
 	icon_size = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
 
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_FOLDER), icon_size, &config.hfolder);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_FOLDER_CURRENT), icon_size, &config.hfolder_current);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_SUCCESS), icon_size, &config.hsuccess);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCEW (IDI_FAULT), icon_size, &config.hfailed);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER), icon_size, &config.hfolder);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER_CURRENT), icon_size, &config.hfolder_current);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_SUCCESS), icon_size, &config.hsuccess);
+	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FAULT), icon_size, &config.hfailed);
 
 	if (config.himglist)
 	{
-		ImageList_SetIconSize (config.himglist, icon_size, icon_size);
+		_r_imagelist_setsize (config.himglist, icon_size);
 	}
 	else
 	{
-		config.himglist = ImageList_Create (icon_size, icon_size, ILC_COLOR32 | ILC_HIGHQUALITYSCALE, 0, 5);
+		status = _r_imagelist_create (icon_size, icon_size, ILC_COLOR32 | ILC_HIGHQUALITYSCALE, 0, 5, &config.himglist);
 
-		if (config.himglist)
+		if (SUCCEEDED (status))
 		{
-			ImageList_ReplaceIcon (config.himglist, -1, config.hfolder);
-			ImageList_ReplaceIcon (config.himglist, -1, config.hfolder_current);
-			ImageList_ReplaceIcon (config.himglist, -1, config.hsuccess);
-			ImageList_ReplaceIcon (config.himglist, -1, config.hfailed);
+			_r_imagelist_addicon (config.himglist, config.hfolder, NULL);
+			_r_imagelist_addicon (config.himglist, config.hfolder_current, NULL);
+			_r_imagelist_addicon (config.himglist, config.hsuccess, NULL);
+			_r_imagelist_addicon (config.himglist, config.hfailed, NULL);
 		}
 	}
 
@@ -153,16 +154,16 @@ VOID _app_setpagepos (
 )
 {
 	RECT rect;
-	INT pos;
+	HWND hctrl;
 
-	if (!GetWindowRect (GetDlgItem (hwnd, IDC_ITEMLIST), &rect))
+	hctrl = GetDlgItem (hwnd, IDC_ITEMLIST);
+
+	if (!GetWindowRect (hctrl, &rect))
 		return;
 
 	MapWindowPoints (HWND_DESKTOP, hwnd, (PPOINT)&rect, 2);
 
-	pos = rect.top;
-
-	SetWindowPos (hchild, NULL, _r_calc_rectwidth (&rect) + rect.left * 2, pos, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+	SetWindowPos (hchild, NULL, _r_calc_rectwidth (&rect) + rect.left * 2, rect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
 }
 
 ULONG_PTR _app_getpageid (
@@ -185,7 +186,8 @@ ULONG_PTR _app_getcurrentpage (
 	HTREEITEM hitem;
 	LPARAM lparam;
 
-	hitem = (HTREEITEM)SendDlgItemMessageW (hwnd, IDC_ITEMLIST, TVM_GETNEXTITEM, TVGN_CARET, 0);
+	//hitem = _r_treeview_getnextitem (hwnd, IDC_ITEMLIST, NULL, TVGN_CARET);
+	hitem = (HTREEITEM)_r_wnd_sendmessage (hwnd, IDC_ITEMLIST, TVM_GETNEXTITEM, TVGN_CARET, 0);
 
 	if (!_r_treeview_getnextitem (hwnd, IDC_ITEMLIST, hitem, TVGN_PARENT))
 		hitem = _r_treeview_getnextitem (hwnd, IDC_ITEMLIST, hitem, TVGN_CHILD);
@@ -219,21 +221,21 @@ NTSTATUS _app_tool_ping (
 	_In_ LPVOID lparam
 )
 {
-	SOCKADDR_IN6_LH icmp6_local_addr = {0};
-	SOCKADDR_IN6_LH icmp6_remote_addr = {0};
 	IP_OPTION_INFORMATION icmp_options = {0};
+	SOCKADDR_IN6_LH icmp6_remote_addr = {0};
+	SOCKADDR_IN6_LH icmp6_local_addr = {0};
 	PICMP_ECHO_REPLY reply = NULL;
 	IPAddr icmp_local_addr = 0;
 	IPAddr icmp_remote_addr = 0;
 	ADDRINFOW hints = {0};
+	LPSOCKADDR sockaddr_ip;
+	PADDRINFOW result;
 	R_STRINGREF sr;
 	WCHAR buffer[32];
 	WCHAR ipaddr[32];
 	PR_STRING string;
-	PR_BYTE bytes;
 	PR_BYTE icmp_echo;
-	PADDRINFOW result;
-	LPSOCKADDR sockaddr_ip;
+	PR_BYTE bytes;
 	HWND hwnd;
 	HANDLE icmp_handle;
 	ULONG_PTR page_id;
@@ -247,7 +249,7 @@ NTSTATUS _app_tool_ping (
 
 	page_id = _app_getpageid (IDD_PAGE_PING);
 
-	page_list[page_id].thread = TRUE;
+	page_list[page_id].is_thread = TRUE;
 
 	_r_ctrl_setstring (hwnd, IDC_PING_START, L"Abort");
 	_r_ctrl_enable (hwnd, IDC_PING_CLEAR, FALSE);
@@ -285,7 +287,7 @@ NTSTATUS _app_tool_ping (
 
 	for (LONG i = 0; i < retries; i++)
 	{
-		if (!page_list[page_id].thread)
+		if (!page_list[page_id].is_thread)
 			break;
 
 		status = GetAddrInfoW (string->buffer, NULL, &hints, &result);
@@ -338,24 +340,24 @@ NTSTATUS _app_tool_ping (
 						{
 							case IP_SUCCESS:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
+								_r_listview_additem (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_DEFAULT, I_DEFAULT);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", reply->DataSize);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->Options.Tos);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->Options.Ttl);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								break;
 							}
 
 							case IP_REQ_TIMED_OUT:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_FAULT, I_GROUPIDNONE, 0);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, L"Timeout");
+								_r_listview_additem (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_FAULT, I_DEFAULT, I_DEFAULT);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, L"Timeout", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								break;
 							}
@@ -363,7 +365,7 @@ NTSTATUS _app_tool_ping (
 							default:
 							{
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", reply->Status);
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_DEFAULT, I_DEFAULT);
 
 								break;
 							}
@@ -406,24 +408,25 @@ NTSTATUS _app_tool_ping (
 						{
 							case IP_SUCCESS:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_GROUPIDNONE, 0);
+								_r_listview_additem (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_SUCCESS, I_DEFAULT, I_DEFAULT);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d bytes", reply->DataSize);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->RoundTripTime);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 2, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", reply->Options.Ttl);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer);
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 3, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								break;
 							}
 
 							case IP_REQ_TIMED_OUT:
 							{
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_FAULT, I_GROUPIDNONE, 0);
-								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, L"Timeout");
+								_r_listview_additem (hwnd, IDC_PING_RESULT, item_id, ipaddr, IL_FAULT, I_DEFAULT, I_DEFAULT);
+
+								_r_listview_setitem (hwnd, IDC_PING_RESULT, item_id, 1, L"Timeout", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 								break;
 							}
@@ -431,7 +434,7 @@ NTSTATUS _app_tool_ping (
 							default:
 							{
 								_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: %d", reply->Status);
-								_r_listview_additem_ex (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_GROUPIDNONE, 0);
+								_r_listview_additem (hwnd, IDC_PING_RESULT, item_id, buffer, IL_FAULT, I_DEFAULT, I_DEFAULT);
 
 								break;
 							}
@@ -448,7 +451,7 @@ NTSTATUS _app_tool_ping (
 
 CleanupExit:
 
-	page_list[page_id].thread = FALSE;
+	page_list[page_id].is_thread = FALSE;
 
 	if (string)
 		_r_obj_dereference (string);
@@ -485,7 +488,7 @@ NTSTATUS _app_tool_externalip (
 
 	_r_ctrl_enable (hwnd, IDC_IP_REFRESH, FALSE);
 
-	_r_listview_fillitems (hwnd, IDC_IP_RESULT, -1, -1, 1, L"Loading...", I_IMAGENONE);
+	_r_listview_fillitems (hwnd, IDC_IP_RESULT, INT_ERROR, INT_ERROR, 1, L"Loading...", I_DEFAULT);
 
 	proxy_string = _r_app_getproxyconfiguration ();
 
@@ -531,7 +534,7 @@ NTSTATUS _app_tool_externalip (
 	}
 
 	if (!result)
-		_r_listview_fillitems (hwnd, IDC_IP_RESULT, -1, -1, 1, L"Error...", IL_FAULT);
+		_r_listview_fillitems (hwnd, IDC_IP_RESULT, INT_ERROR, INT_ERROR, 1, L"Error...", IL_FAULT);
 
 	_r_ctrl_enable (hwnd, IDC_IP_REFRESH, TRUE);
 
@@ -582,7 +585,7 @@ NTSTATUS _app_tool_downloadspeed (
 	_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_START, L"Прервать");
 	_r_ctrl_enable (hwnd, IDC_SPEEDMETER_CLEAR, FALSE);
 
-	page_list[page_id].thread = TRUE;
+	page_list[page_id].is_thread = TRUE;
 
 	url = _r_ctrl_getstring (hwnd, IDC_SPEEDMETER_LINK);
 
@@ -608,7 +611,7 @@ NTSTATUS _app_tool_downloadspeed (
 
 		while (TRUE)
 		{
-			if (!page_list[page_id].thread)
+			if (!page_list[page_id].is_thread)
 				break;
 
 			if (_r_inet_readrequest (hrequest, buff, length, &recieved, &total_size))
@@ -629,18 +632,18 @@ NTSTATUS _app_tool_downloadspeed (
 				}
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d kbps", min_speed);
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 0, 1, buffer);
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 0, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d kbps", (min_speed + max_speed) / 2);
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 1, 2, buffer);
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 1, 2, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d kbps", max_speed);
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 2, 3, buffer);
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 2, 3, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 				_r_format_number (buffer, RTL_NUMBER_OF (buffer), total_size);
 				_r_str_append (buffer, RTL_NUMBER_OF (buffer), L" bytes");
 
-				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 5, 5, buffer);
+				_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 5, 5, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 			}
 			else
 			{
@@ -656,7 +659,7 @@ NTSTATUS _app_tool_downloadspeed (
 		GetLocalTime (&st);
 
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
-		_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 6, 2, buffer);
+		_r_listview_setitem (hwnd, IDC_SPEEDMETER_RESULT, 6, 2, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
@@ -680,7 +683,7 @@ CleanupExit:
 	if (url)
 		_r_obj_dereference (url);
 
-	page_list[page_id].thread = FALSE;
+	page_list[page_id].is_thread = FALSE;
 
 	_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_START, L"Start");
 
@@ -892,14 +895,14 @@ VOID _app_tool_sharedinfo (
 	_In_ HWND hwnd
 )
 {
-	WCHAR buffer[256];
 	PSHARE_INFO_502 share_info = NULL;
 	PSHARE_INFO_502 p;
+	WCHAR buffer[256];
 	ULONG readed;
 	ULONG resume_handle = 0;
 	ULONG total;
 	INT item_id = 0;
-	NET_API_STATUS status;
+	ULONG status;
 
 	_r_listview_deleteallitems (hwnd, IDC_SHAREDINFO);
 
@@ -921,17 +924,18 @@ VOID _app_tool_sharedinfo (
 
 			for (ULONG i = 1; i <= readed; i++)
 			{
-				_r_listview_additem_ex (hwnd, IDC_SHAREDINFO, item_id, p->shi502_netname, IL_SUCCESS, I_GROUPIDNONE, 0);
-				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 1, p->shi502_path[0] ? p->shi502_path : SZ_UNKNOWN);
+				_r_listview_additem (hwnd, IDC_SHAREDINFO, item_id, p->shi502_netname, IL_SUCCESS, I_DEFAULT, I_DEFAULT);
+				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 1, p->shi502_path[0] ? p->shi502_path : SZ_UNKNOWN, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 				_app_getsharedtype (buffer, RTL_NUMBER_OF (buffer), p->shi502_type);
-				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 2, buffer);
 
-				if (p->shi502_max_uses == -1)
+				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 2, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
+
+				if (p->shi502_max_uses == INT_ERROR)
 					_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"unlimited");
 
 				_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d/%s", p->shi502_current_uses, buffer);
-				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 3, buffer);
+				_r_listview_setitem (hwnd, IDC_SHAREDINFO, item_id, 3, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 				item_id += 1;
 
@@ -961,7 +965,7 @@ VOID _app_tool_sysinfo (
 
 	_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d.%d", LOBYTE (wsa.wVersion), HIBYTE (wsa.wVersion));
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 	status = RtlGetVersion (&version_info);
 
@@ -976,7 +980,7 @@ VOID _app_tool_sysinfo (
 			version_info.dwBuildNumber
 		);
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	if (IsNetworkAlive (&flags))
@@ -996,7 +1000,7 @@ VOID _app_tool_sysinfo (
 		_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"No connection");
 	}
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 	length = sizeof (FIXED_INFO) * 2;
 	network_params = _r_mem_allocate (length);
@@ -1039,15 +1043,16 @@ VOID _app_tool_sysinfo (
 			}
 		}
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableRouting ? L"On" : L"Off");
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableProxy ? L"On" : L"Off");
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableDns ? L"On" : L"Off");
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableRouting ? L"On" : L"Off", I_DEFAULT, I_DEFAULT, I_DEFAULT);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableProxy ? L"On" : L"Off", I_DEFAULT, I_DEFAULT, I_DEFAULT);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, network_params->EnableDns ? L"On" : L"Off", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
-		_r_listview_fillitems (hwnd, IDC_SYSINFO, -1, -1, 1, L"n/a", IL_FAULT);
+		_r_listview_fillitems (hwnd, IDC_SYSINFO, INT_ERROR, INT_ERROR, 1, L"n/a", IL_FAULT);
+
 		item_id += 4;
 	}
 
@@ -1056,20 +1061,20 @@ VOID _app_tool_sysinfo (
 
 	sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); // IPv4
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	closesocket (sock);
 
 	sock = socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP); // IPv6
 	//sock = WSASocketW (AF_INET6, SOCK_STREAM, IPPROTO_TCP); // IPv6
 
-	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On");
+	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	closesocket (sock);
 
 	status = _r_sys_getusername (_r_sys_getcurrenttoken ()->token_sid, FALSE, &string);
 
 	if (NT_SUCCESS (status))
 	{
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, string->buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, string->buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_obj_dereference (string);
 	}
@@ -1077,14 +1082,14 @@ VOID _app_tool_sysinfo (
 	{
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error (0x%08X)", status);
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	status = _r_sys_getcomputername (&string);
 
 	if (NT_SUCCESS (status))
 	{
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, string->buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, string->buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_obj_dereference (string);
 	}
@@ -1092,7 +1097,7 @@ VOID _app_tool_sysinfo (
 	{
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error (0x%08X)", status);
 
-		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 }
 
@@ -1135,17 +1140,17 @@ VOID _app_tool_hostaddress (
 			{
 				if (ptr->ai_family == AF_INET)
 				{
-					_r_listview_additem_ex (hwnd, IDC_HOSTADDR_RESULT, item_id, ipaddr, IL_SUCCESS, 0, 0);
+					_r_listview_additem (hwnd, IDC_HOSTADDR_RESULT, item_id, ipaddr, IL_SUCCESS, 0, I_DEFAULT);
 				}
 				else if (ptr->ai_family == AF_INET6)
 				{
-					_r_listview_additem_ex (hwnd, IDC_HOSTADDR_RESULT, item_id, ipaddr, IL_SUCCESS, 1, 0);
+					_r_listview_additem (hwnd, IDC_HOSTADDR_RESULT, item_id, ipaddr, IL_SUCCESS, 1, I_DEFAULT);
 				}
 				else
 				{
 					_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%s (%d)", ipaddr, ptr->ai_family);
 
-					_r_listview_additem_ex (hwnd, IDC_HOSTADDR_RESULT, item_id, buffer, IL_SUCCESS, 2, 0);
+					_r_listview_additem (hwnd, IDC_HOSTADDR_RESULT, item_id, buffer, IL_SUCCESS, 2, I_DEFAULT);
 				}
 
 				item_id += 1;
@@ -1225,11 +1230,11 @@ NTSTATUS _app_tool_urlinfo (
 	{
 		StrFormatByteSizeW (flags, buffer, RTL_NUMBER_OF (buffer));
 
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	length = sizeof (st);
@@ -1240,27 +1245,27 @@ NTSTATUS _app_tool_urlinfo (
 
 	if (timestamp && string)
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, string->buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, string->buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	length = sizeof (buffer);
 	result = WinHttpQueryOption (hrequest, WINHTTP_QUERY_ACCEPT_RANGES, &buffer, &length);
 
-	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, result ? L"Supported" : L"Unsupported");
+	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, result ? L"Supported" : L"Unsupported", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 	length = sizeof (buffer);
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_CONTENT_TYPE, &buffer, &length))
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	length = sizeof (buffer);
@@ -1269,33 +1274,33 @@ NTSTATUS _app_tool_urlinfo (
 	{
 		StrTrimW (buffer, L"\""); // Strip Quotes
 
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	length = sizeof (buffer);
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_VERSION, &buffer, &length))
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	length = sizeof (buffer);
 
 	if (WinHttpQueryOption (hrequest, WINHTTP_QUERY_SERVER, &buffer, &length))
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 	else
 	{
-		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no");
+		_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, L"no", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	length = sizeof (flags);
@@ -1304,7 +1309,7 @@ NTSTATUS _app_tool_urlinfo (
 
 	_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"%d", status);
 
-	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer);
+	_r_listview_setitem (hwnd, IDC_URLINFO_RESULT, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 	if (proxy_string)
 		_r_obj_dereference (proxy_string);
@@ -1382,45 +1387,45 @@ VOID _app_print_tcpstats (
 			}
 		}
 
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRtoMin);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRtoMax);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64InSegs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64OutSegs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRetransSegs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutRsts);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInErrs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwAttemptFails);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwActiveOpens);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwPassiveOpens);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwCurrEstab);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwEstabResets);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
-		if (stats->dwMaxConn == -1)
+		if (stats->dwMaxConn == INT_ERROR)
 		{
 			_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"Variable");
 		}
@@ -1429,10 +1434,10 @@ VOID _app_print_tcpstats (
 			_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwMaxConn);
 		}
 
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumConns);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	status = GetTcpStatisticsEx2 (stats, AF_INET6);
@@ -1474,45 +1479,45 @@ VOID _app_print_tcpstats (
 			}
 		}
 
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRtoMin);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRtoMax);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64InSegs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64OutSegs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRetransSegs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutRsts);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInErrs);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwAttemptFails);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwActiveOpens);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwPassiveOpens);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwCurrEstab);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwEstabResets);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
-		if (stats->dwMaxConn == -1)
+		if (stats->dwMaxConn == INT_ERROR)
 		{
 			_r_str_copy (buffer, RTL_NUMBER_OF (buffer), L"Variable");
 		}
@@ -1521,10 +1526,10 @@ VOID _app_print_tcpstats (
 			_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwMaxConn);
 		}
 
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumConns);
-		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_TCP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 }
 
@@ -1549,19 +1554,19 @@ VOID _app_print_udpstats (
 	else
 	{
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64InDatagrams);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInErrors);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 1, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 1, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNoPorts);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 2, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 2, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64OutDatagrams);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 3, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 3, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumAddrs);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 4, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 4, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	status = GetUdpStatisticsEx2 (stats, AF_INET6);
@@ -1571,24 +1576,25 @@ VOID _app_print_udpstats (
 	if (status != NO_ERROR)
 	{
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: " SZ_HEX, status);
+
 		_r_listview_fillitems (hwnd, IDC_UDP_STATISTIC, 5, 10, 1, buffer, IL_FAULT);
 	}
 	else
 	{
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64InDatagrams);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInErrors);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 1, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 1, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNoPorts);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 2, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 2, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dw64OutDatagrams);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 3, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 3, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumAddrs);
-		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 4, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_UDP_STATISTIC, item_id + 4, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 }
 
@@ -1613,16 +1619,16 @@ VOID _app_print_icmpstats (
 	else
 	{
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpInStats.dwMsgs);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpOutStats.dwErrors);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 1, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 1, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpOutStats.dwMsgs);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 2, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 2, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpOutStats.dwErrors);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 3, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 3, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	status = GetIcmpStatisticsEx (stats, AF_INET6);
@@ -1632,21 +1638,22 @@ VOID _app_print_icmpstats (
 	if (status != NO_ERROR)
 	{
 		_r_str_printf (buffer, RTL_NUMBER_OF (buffer), L"Error: " SZ_HEX, status);
+
 		_r_listview_fillitems (hwnd, IDC_ICMP_STATISTIC, 4, 8, 1, buffer, IL_FAULT);
 	}
 	else
 	{
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpInStats.dwMsgs);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpOutStats.dwErrors);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 1, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 1, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpOutStats.dwMsgs);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 2, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 2, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->icmpOutStats.dwErrors);
-		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 3, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_ICMP_STATISTIC, item_id + 3, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 }
 
@@ -1697,73 +1704,73 @@ VOID _app_print_ipstats (
 			}
 		}
 
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwForwDatagrams);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInReceives);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInHdrErrors);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInAddrErrors);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInUnknownProtos);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInDiscards);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRoutingDiscards);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutDiscards);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutNoRoutes);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmOks);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmFails);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmReqds);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwFragOks);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwFragFails);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwFragCreates);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmTimeout);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInDelivers);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutRequests);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwDefaultTTL);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumIf);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumAddr);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumRoutes);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 
 	status = GetIpStatisticsEx (stats, AF_INET6);
@@ -1805,73 +1812,73 @@ VOID _app_print_ipstats (
 			}
 		}
 
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwForwDatagrams);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInReceives);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInHdrErrors);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInAddrErrors);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInUnknownProtos);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInDiscards);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwRoutingDiscards);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutDiscards);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutNoRoutes);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmOks);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmFails);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmReqds);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwFragOks);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwFragFails);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwFragCreates);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwReasmTimeout);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwInDelivers);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwOutRequests);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwDefaultTTL);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumIf);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumAddr);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 
 		_r_format_number (buffer, RTL_NUMBER_OF (buffer), stats->dwNumRoutes);
-		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer);
+		_r_listview_setitem (hwnd, IDC_IP_STATISTIC, item_id++, 1, buffer, I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	}
 }
 
@@ -1983,6 +1990,7 @@ VOID _app_initializepages (
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_URLINFO;
+	page_list[idx].listview_id = IDC_URLINFO_RESULT;
 
 	page_list[idx].title = IDS_TOOL_INFORMATION;
 	page_list[idx].description = IDS_TOOL_INFORMATION_INFO;
@@ -2005,6 +2013,7 @@ VOID _app_initializepages (
 	idx += 1;
 
 	page_list[idx].dlg_id = IDD_PAGE_IP;
+	page_list[idx].listview_id = IDC_IP_RESULT;
 	page_list[idx].category = 1;
 
 	page_list[idx].title = IDS_TOOL_IP;
@@ -2066,7 +2075,7 @@ VOID _app_initializepages (
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (category_list); i++)
 	{
-		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, TVIS_EXPANDED, NULL, -1);
+		category_list[i].hitem = _r_treeview_additem (hwnd, IDC_ITEMLIST, _r_locale_getstring (category_list[i].name), IL_FOLDER, TVIS_EXPANDED, NULL, INT_ERROR);
 	}
 
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (page_list); i++)
@@ -2081,10 +2090,56 @@ VOID _app_initializepages (
 			(LPARAM)i
 		);
 
-		page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCEW (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
+		page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCE (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
 
 		if (page_list[i].hpage)
 			_app_setpagepos (hwnd, page_list[i].hpage);
+	}
+}
+
+VOID _app_resizecolumns (
+	_In_ HWND hwnd,
+	_In_ ULONG_PTR page_id
+)
+{
+	switch (page_list[page_id].dlg_id)
+	{
+		case IDD_PAGE_PING:
+		{
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 0, NULL, -70);
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 1, NULL, -10);
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 2, NULL, -10);
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 3, NULL, -10);
+
+			break;
+		}
+
+		case IDD_PAGE_SHAREDINFO:
+		{
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 0, NULL, -20);
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 1, NULL, -30);
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 2, NULL, -30);
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 3, NULL, -20);
+
+			break;
+		}
+
+		case IDD_PAGE_SPEEDMETER:
+		case IDD_PAGE_URLDECODER:
+		case IDD_PAGE_HOSTADDR:
+		case IDD_PAGE_URLINFO:
+		case IDD_PAGE_IP:
+		case IDD_PAGE_SYSINFO:
+		case IDD_PAGE_TCP_STATISTIC:
+		case IDD_PAGE_UDP_STATISTIC:
+		case IDD_PAGE_ICMP_STATISTIC:
+		case IDD_PAGE_IP_STATISTIC:
+		{
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 0, NULL, -50);
+			_r_listview_setcolumn (page_list[page_id].hpage, page_list[page_id].listview_id, 1, NULL, -50);
+
+			break;
+		}
 	}
 }
 
@@ -2093,7 +2148,6 @@ VOID _app_initializepage (
 	_In_ INT page_id
 )
 {
-	INT width;
 	INT item_id;
 
 	//if (!IsWindowVisible (GetDlgItem (hwnd, page_id)))
@@ -2103,7 +2157,7 @@ VOID _app_initializepage (
 	{
 		case IDD_PAGE_PING:
 		{
-			_r_wnd_sendmessage (hwnd, IDC_PING_UPDOWN, UDM_SETRANGE32, 1, 1000);
+			_r_updown_setrange (hwnd, IDC_PING_UPDOWN, 1, 1000);
 
 			_r_ctrl_setstring (hwnd, IDC_PING_HOST, _r_obj_getstring (_r_config_getstring (L"PingAddress", APP_HOST)));
 
@@ -2113,10 +2167,10 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_PING_RESULT, config.himglist);
 
-			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 0, L"Address", 190, 0);
-			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 1, L"Size", 100, 0);
-			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 2, L"Delay", 80, 0);
-			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 3, L"TTL", 80, 0);
+			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 0, L"Address", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 1, L"Size", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 2, L"Delay", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_PING_RESULT, 3, L"TTL", 50, 0);
 
 			break;
 		}
@@ -2127,10 +2181,8 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_SPEEDMETER_RESULT, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_SPEEDMETER_RESULT);
-
-			_r_listview_addcolumn (hwnd, IDC_SPEEDMETER_RESULT, 0, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_SPEEDMETER_RESULT, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_SPEEDMETER_RESULT, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_SPEEDMETER_RESULT, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_SPEEDMETER_RESULT, 0, L"Speed", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_SPEEDMETER_RESULT, 1, L"Time", 0, G_STYLE, G_STYLE);
@@ -2138,19 +2190,19 @@ VOID _app_initializepage (
 
 			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Minimum", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Average", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Maximum", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Minimum", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Average", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Maximum", IL_SUCCESS, 0, I_DEFAULT);
 
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Test started", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Test finished", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Execution time", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Test started", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Test finished", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Execution time", IL_SUCCESS, 1, I_DEFAULT);
 
-			_r_listview_additem_ex (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Recieved data length", IL_SUCCESS, 2, 0);
+			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Recieved data length", IL_SUCCESS, 2, I_DEFAULT);
 
 			_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_LINK, _r_obj_getstring (_r_config_getstring (L"SpeedmeterLink", APP_HOST)));
 
-			_r_wnd_sendmessage (hwnd, IDC_SPEEDMETER_UPDOWN, UDM_SETRANGE32, 0, 1000);
+			_r_updown_setrange (hwnd, IDC_SPEEDMETER_UPDOWN, 0, 1000);
 
 			SetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, _r_config_getlong (L"SpeedMeterLimit", 10), TRUE);
 
@@ -2176,9 +2228,8 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_HOSTADDR_RESULT, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_HOSTADDR_RESULT);
-
-			_r_listview_addcolumn (hwnd, IDC_HOSTADDR_RESULT, 0, L"Parameter", width, 0);
+			_r_listview_addcolumn (hwnd, IDC_HOSTADDR_RESULT, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_HOSTADDR_RESULT, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_HOSTADDR_RESULT, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_HOSTADDR_RESULT, 1, L"IPv6 ", 0, G_STYLE, G_STYLE);
@@ -2214,30 +2265,28 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_URLINFO_RESULT, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_URLINFO_RESULT);
-
-			_r_listview_addcolumn (hwnd, IDC_URLINFO_RESULT, 0, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_URLINFO_RESULT, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_URLINFO_RESULT, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_URLINFO_RESULT, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_URLINFO_RESULT, 0, L"File information", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_URLINFO_RESULT, 1, L"Server information ", 0, G_STYLE, G_STYLE);
 
 			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Size", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Last-modified", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Resume downloading", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Content type", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Etag", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Size", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Last-modified", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Resume downloading", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Content type", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Etag", IL_SUCCESS, 0, I_DEFAULT);
 
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Protocol", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Server", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_URLINFO_RESULT, item_id++, L"Status", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Protocol", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Server", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Status", IL_SUCCESS, 1, I_DEFAULT);
 
 			_r_ctrl_setstring (hwnd, IDC_URLINFO_LINK, _r_obj_getstring (_r_config_getstring (L"UrlInfoLink", APP_HOST)));
 			_r_ctrl_checkbutton (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE));
 
-			_r_wnd_sendmessage (hwnd, 0, WM_COMMAND, MAKELPARAM (IDC_URLINFO_HEADER_CHK, 0), 0);
+			_r_ctrl_sendcommand (hwnd, IDC_URLINFO_HEADER_CHK, 0);
 
 			break;
 		}
@@ -2248,26 +2297,24 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_IP_RESULT, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_IP_RESULT);
-
-			_r_listview_addcolumn (hwnd, IDC_IP_RESULT, 0, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_IP_RESULT, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_IP_RESULT, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_IP_RESULT, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_IP_RESULT, 0, L"External address", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_IP_RESULT, 1, L"Local address", 0, G_STYLE, G_STYLE);
 
 			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Адрес", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Прокси", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Провайдер", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Организация", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Город", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_RESULT, item_id++, L"Координаты", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Адрес", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Прокси", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Провайдер", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Организация", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Город", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Координаты", IL_SUCCESS, 0, I_DEFAULT);
 
 			_r_ctrl_checkbutton (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE));
 
-			_r_wnd_sendmessage (hwnd, 0, WM_COMMAND, MAKELPARAM (IDC_IP_REFRESH, 0), 0);
+			_r_ctrl_sendcommand (hwnd, IDC_IP_REFRESH, 0);
 
 			break;
 		}
@@ -2278,12 +2325,12 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_SHAREDINFO, config.himglist);
 
-			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 0, L"Name", 190, 0);
-			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 1, L"Path", 190, 0);
-			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 2, L"Type", 190, 0);
-			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 3, L"Connected", 190, 0);
+			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 0, L"Name", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 1, L"Path", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 2, L"Type", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 3, L"Connected", 50, 0);
 
-			_r_wnd_sendmessage (hwnd, 0, WM_COMMAND, MAKELPARAM (IDC_SHAREDINFO_START, 0), 0);
+			_r_ctrl_sendcommand (hwnd, IDC_SHAREDINFO_START, 0);
 
 			break;
 		}
@@ -2294,10 +2341,8 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_SYSINFO, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_SYSINFO);
-
-			_r_listview_addcolumn (hwnd, IDC_SYSINFO, 0, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_SYSINFO, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_SYSINFO, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_SYSINFO, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_SYSINFO, 0, L"General", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_SYSINFO, 1, L"Network configuration", 0, G_STYLE, G_STYLE);
@@ -2306,20 +2351,20 @@ VOID _app_initializepage (
 
 			item_id = 0;
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Winsock version", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Windows version", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"Winsock version", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"Windows version", IL_SUCCESS, 0, I_DEFAULT);
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Состояние сети", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Тип узла", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Переадресация", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Proxy", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"DNS", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"Состояние сети", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"Тип узла", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"Переадресация", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"Proxy", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"DNS", IL_SUCCESS, 1, I_DEFAULT);
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"IPv4", IL_SUCCESS, 2, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"IPv6", IL_SUCCESS, 2, 0);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"IPv4", IL_SUCCESS, 2, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"IPv6", IL_SUCCESS, 2, I_DEFAULT);
 
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"User name", IL_SUCCESS, 3, 0);
-			_r_listview_additem_ex (hwnd, IDC_SYSINFO, item_id++, L"Computer name", IL_SUCCESS, 3, 0);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"User name", IL_SUCCESS, 3, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_SYSINFO, item_id++, L"Computer name", IL_SUCCESS, 3, I_DEFAULT);
 
 			_app_tool_sysinfo (hwnd);
 
@@ -2332,10 +2377,8 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_TCP_STATISTIC, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_TCP_STATISTIC);
-
-			_r_listview_addcolumn (hwnd, IDC_TCP_STATISTIC, 0, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_TCP_STATISTIC, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_TCP_STATISTIC, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_TCP_STATISTIC, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_TCP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_TCP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
@@ -2343,38 +2386,38 @@ VOID _app_initializepage (
 			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"RTO algorithm", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The minimum RTO value (ms)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The maximum RTO value (ms)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent (Again)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent with the reset flag", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received errors", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Failed connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (active)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (passive)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Established connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Discarded connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Max. number of connections", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Number of connections", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"RTO algorithm", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"The minimum RTO value (ms)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"The maximum RTO value (ms)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent (Again)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent with the reset flag", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received errors", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Failed connections", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (active)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (passive)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Established connections", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Discarded connections", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Max. number of connections", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Number of connections", IL_SUCCESS, 0, I_DEFAULT);
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"RTO algorithm", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The minimum RTO value (ms)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"The maximum RTO value (ms)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent (Again)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent with the reset flag", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received errors", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Failed connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (active)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (passive)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Established connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Discarded connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Max. number of connections", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_TCP_STATISTIC, item_id++, L"Number of connections", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"RTO algorithm", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"The minimum RTO value (ms)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"The maximum RTO value (ms)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent (Again)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Sent with the reset flag", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Received errors", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Failed connections", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (active)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Open (passive)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Established connections", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Discarded connections", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Max. number of connections", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_TCP_STATISTIC, item_id++, L"Number of connections", IL_SUCCESS, 1, I_DEFAULT);
 
 			break;
 		}
@@ -2385,10 +2428,8 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_UDP_STATISTIC, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_UDP_STATISTIC);
-
-			_r_listview_addcolumn (hwnd, IDC_UDP_STATISTIC, 0, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_UDP_STATISTIC, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_UDP_STATISTIC, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_UDP_STATISTIC, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_UDP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_UDP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
@@ -2396,18 +2437,18 @@ VOID _app_initializepage (
 			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (errors)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (invalid port)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Number of addresses", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (errors)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (invalid port)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Number of addresses", IL_SUCCESS, 0, I_DEFAULT);
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (errors)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (invalid port)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_UDP_STATISTIC, item_id++, L"Number of addresses", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (errors)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Received (invalid port)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Sent", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_UDP_STATISTIC, item_id++, L"Number of addresses", IL_SUCCESS, 1, I_DEFAULT);
 
 			break;
 		}
@@ -2418,10 +2459,8 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_ICMP_STATISTIC, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_ICMP_STATISTIC);
-
-			_r_listview_addcolumn (hwnd, IDC_ICMP_STATISTIC, 1, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_ICMP_STATISTIC, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_ICMP_STATISTIC, 1, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_ICMP_STATISTIC, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_ICMP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_ICMP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
@@ -2429,16 +2468,16 @@ VOID _app_initializepage (
 			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming (errors)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing (errors)", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming (errors)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing (errors)", IL_SUCCESS, 0, I_DEFAULT);
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming (errors)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing (errors)", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Incoming (errors)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_ICMP_STATISTIC, item_id++, L"Outgoing (errors)", IL_SUCCESS, 1, I_DEFAULT);
 
 			break;
 		}
@@ -2449,10 +2488,8 @@ VOID _app_initializepage (
 
 			_r_listview_setimagelist (hwnd, IDC_IP_STATISTIC, config.himglist);
 
-			width = _r_ctrl_getwidth (hwnd, IDC_IP_STATISTIC);
-
-			_r_listview_addcolumn (hwnd, IDC_IP_STATISTIC, 0, L"Parameter", width / 2, 0);
-			_r_listview_addcolumn (hwnd, IDC_IP_STATISTIC, 1, L"Value", width / 2, 0);
+			_r_listview_addcolumn (hwnd, IDC_IP_STATISTIC, 0, L"Parameter", 50, 0);
+			_r_listview_addcolumn (hwnd, IDC_IP_STATISTIC, 1, L"Value", 50, 0);
 
 			_r_listview_addgroup (hwnd, IDC_IP_STATISTIC, 0, L"IPv4", 0, G_STYLE, G_STYLE);
 			_r_listview_addgroup (hwnd, IDC_IP_STATISTIC, 1, L"IPv6", 0, G_STYLE, G_STYLE);
@@ -2460,56 +2497,56 @@ VOID _app_initializepage (
 			item_id = 0;
 
 			// ipv4
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirection", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirected packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in header)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in address)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in protocol)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded incoming packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing routes", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets without a route", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected (error)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets requiring assembly", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets (error)", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragments created", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packet assembly time", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Delivered packets", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets sent", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"TTL value", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of interfaces", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of IP addresses", IL_SUCCESS, 0, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of routes", IL_SUCCESS, 0, 0);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirection", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirected packets", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in header)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in address)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in protocol)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded incoming packets", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing routes", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing packets", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets without a route", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected (error)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets requiring assembly", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets (error)", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragments created", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packet assembly time", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Delivered packets", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets sent", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"TTL value", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of interfaces", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of IP addresses", IL_SUCCESS, 0, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of routes", IL_SUCCESS, 0, I_DEFAULT);
 
 			item_id = 24;
 
 			// ipv6
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirection", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirected packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in header)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in address)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in protocol)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded incoming packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing routes", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets without a route", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected (error)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets requiring assembly", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets (error)", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragments created", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packet assembly time", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Delivered packets", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets sent", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"TTL value", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of interfaces", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of IP addresses", IL_SUCCESS, 1, 0);
-			_r_listview_additem_ex (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of routes", IL_SUCCESS, 1, 0);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirection", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Redirected packets", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in header)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in address)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Recieved (errors in protocol)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded incoming packets", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing routes", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Discarded outgoing packets", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets without a route", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets collected (error)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets requiring assembly", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packets (error)", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragments created", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Fragmented packet assembly time", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Delivered packets", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Packets sent", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"TTL value", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of interfaces", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of IP addresses", IL_SUCCESS, 1, I_DEFAULT);
+			_r_listview_additem (hwnd, IDC_IP_STATISTIC, item_id++, L"Number of routes", IL_SUCCESS, 1, I_DEFAULT);
 
 			break;
 		}
@@ -2639,7 +2676,11 @@ INT_PTR WINAPI PageDlgProc (
 			if (!page_list[page_id].listview_id)
 				break;
 
-			hmenu = LoadMenuW (NULL, MAKEINTRESOURCEW (IDM_LISTVIEW));
+			hmenu = LoadMenuW (NULL, MAKEINTRESOURCE (IDM_LISTVIEW));
+
+			if (!hmenu)
+				break;
+
 			hsubmenu = GetSubMenu (hmenu, 0);
 
 			//if (!_r_listview_getitemcount (page_list[page_id].hpage, page_list[page_id].listview_id))
@@ -2807,10 +2848,10 @@ INT_PTR WINAPI PageDlgProc (
 
 					page_id = _app_getpageid (IDD_PAGE_PING);
 
-					if (page_list[page_id].thread)
+					if (page_list[page_id].is_thread)
 					{
 						if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-							page_list[page_id].thread = FALSE;
+							page_list[page_id].is_thread = FALSE;
 					}
 					else
 					{
@@ -2826,10 +2867,10 @@ INT_PTR WINAPI PageDlgProc (
 
 					page_id = _app_getpageid (IDD_PAGE_SPEEDMETER);
 
-					if (page_list[page_id].thread)
+					if (page_list[page_id].is_thread)
 					{
 						if (_r_show_message (hwnd, MB_YESNO | MB_ICONEXCLAMATION, NULL, L"Do you want to clear data?") == IDYES)
-							page_list[page_id].thread = FALSE;
+							page_list[page_id].is_thread = FALSE;
 					}
 					else
 					{
@@ -2877,7 +2918,7 @@ INT_PTR WINAPI PageDlgProc (
 					}
 					else
 					{
-						_r_listview_fillitems (hwnd, IDC_IP_RESULT, -1, -1, 1, L"n/a", IL_FAULT);
+						_r_listview_fillitems (hwnd, IDC_IP_RESULT, INT_ERROR, INT_ERROR, 1, L"n/a", IL_FAULT);
 					}
 
 					break;
@@ -2910,7 +2951,7 @@ INT_PTR WINAPI PageDlgProc (
 					if (!_r_listview_getitemcount (hwnd, page_list[page_id].listview_id))
 						break;
 
-					if (_r_show_confirmmessage (hwnd, NULL, L"Do you want to clear data?", L"ClearConfirm"))
+					if (_r_show_confirmmessage (hwnd, NULL, L"Do you want to clear data?", L"ClearConfirm", FALSE))
 						_r_listview_deleteallitems (hwnd, page_list[page_id].listview_id);
 
 					break;
@@ -2964,7 +3005,7 @@ LRESULT CALLBACK DlgProc (
 				_r_menu_checkitem (hmenu, IDM_DARKMODE_CHK, 0, MF_BYCOMMAND, _r_theme_isenabled ());
 				_r_menu_checkitem (hmenu, IDM_CHECKUPDATES_CHK, 0, MF_BYCOMMAND, _r_update_isenabled (FALSE));
 
-				hsubmenu = GetSubMenu (hmenu, 1);
+				hsubmenu = GetSubMenu (hmenu, LANG_SUBMENU);
 
 				if (hsubmenu)
 					_r_locale_enum (hsubmenu, LANG_MENU, IDX_LANGUAGE); // enum localizations
@@ -2990,8 +3031,8 @@ LRESULT CALLBACK DlgProc (
 
 		case RM_LOCALIZE:
 		{
-			HMENU hmenu;
 			HMENU hsubmenu;
+			HMENU hmenu;
 			LONG dpi_value;
 
 			dpi_value = _r_dc_getwindowdpi (hwnd);
@@ -3023,7 +3064,7 @@ LRESULT CALLBACK DlgProc (
 			_r_menu_setitemtext (hmenu, IDM_CHECKUPDATES, FALSE, _r_locale_getstring (IDS_CHECKUPDATES));
 			_r_menu_setitemtextformat (hmenu, IDM_ABOUT, FALSE, L"%s\tF1", _r_locale_getstring (IDS_ABOUT));
 
-			hsubmenu = GetSubMenu (hmenu, 1);
+			hsubmenu = GetSubMenu (hmenu, LANG_SUBMENU);
 
 			if (hsubmenu)
 			{
@@ -3046,11 +3087,11 @@ LRESULT CALLBACK DlgProc (
 			KillTimer (hwnd, 1337);
 
 			for (INT i = 0; i < PAGE_COUNT; i++)
-				page_list[i].thread = FALSE;
+				page_list[i].is_thread = FALSE;
 
 			_r_config_setlong (L"LastItem", (LONG)_app_getcurrentpage (hwnd));
 
-			ImageList_Destroy (config.himglist);
+			_r_imagelist_destroy (config.himglist);
 
 			WSACleanup ();
 
@@ -3061,7 +3102,14 @@ LRESULT CALLBACK DlgProc (
 
 		case WM_SIZE:
 		{
+			ULONG_PTR page_id;
+
 			_r_layout_resize (&layout_manager, wparam);
+
+			page_id = _app_getcurrentpage (hwnd);
+
+			_app_resizecolumns (hwnd, page_id);
+
 			break;
 		}
 
@@ -3096,9 +3144,9 @@ LRESULT CALLBACK DlgProc (
 			{
 				case TVN_SELCHANGED:
 				{
+					LPNMTREEVIEWW lpnmtv;
 					ULONG_PTR page_id_old;
 					ULONG_PTR page_id_new;
-					LPNMTREEVIEWW lpnmtv;
 
 					if (wparam != IDC_ITEMLIST)
 						break;
@@ -3111,16 +3159,18 @@ LRESULT CALLBACK DlgProc (
 					if (page_list[page_id_old].hpage)
 						ShowWindow (page_list[page_id_old].hpage, SW_HIDE);
 
-					if (page_id_new == -1)
+					if (page_id_new == INT_ERROR)
 					{
 						_r_treeview_selectfirstchild (hwnd, IDC_ITEMLIST, lpnmtv->itemNew.hItem);
 
-						return 0;
+						break;
 					}
 
 					if (page_list[page_id_new].hpage)
 					{
 						_app_setpagepos (hwnd, page_list[page_id_new].hpage);
+
+						_app_resizecolumns (hwnd, page_id_new);
 
 						ShowWindow (page_list[page_id_new].hpage, SW_SHOW);
 					}
@@ -3168,7 +3218,7 @@ LRESULT CALLBACK DlgProc (
 
 					if (hmenu)
 					{
-						hsubmenu = GetSubMenu (GetSubMenu (hmenu, 1), LANG_MENU);
+						hsubmenu = GetSubMenu (GetSubMenu (hmenu, LANG_SUBMENU), LANG_MENU);
 
 						if (hsubmenu)
 							_r_locale_apply (hsubmenu, ctrl_id, IDX_LANGUAGE);
@@ -3270,10 +3320,10 @@ INT APIENTRY wWinMain (
 	if (!_r_app_initialize (NULL))
 		return ERROR_APP_INIT_FAILURE;
 
-	hwnd = _r_app_createwindow (hinst, MAKEINTRESOURCEW (IDD_MAIN), MAKEINTRESOURCEW (IDI_MAIN), &DlgProc);
+	hwnd = _r_app_createwindow (hinst, MAKEINTRESOURCE (IDD_MAIN), MAKEINTRESOURCE (IDI_MAIN), &DlgProc);
 
 	if (!hwnd)
 		return ERROR_APP_INIT_FAILURE;
 
-	return _r_wnd_message_callback (hwnd, MAKEINTRESOURCEW (IDA_MAIN));
+	return _r_wnd_message_callback (hwnd, MAKEINTRESOURCE (IDA_MAIN));
 }

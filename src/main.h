@@ -27,11 +27,12 @@
 #define DIVIDER_TRIM L"\r\n "
 
 #define SZ_UNKNOWN L"<unknown>"
-#define SZ_HEX L"0x%06X"
+#define SZ_HEX L"0x%08X"
 
 #define EX_STYLE LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT | LVS_EX_INFOTIP | LVS_EX_LABELTIP
 #define G_STYLE LVGS_COLLAPSIBLE
 
+#define LANG_SUBMENU 1
 #define LANG_MENU 4
 
 #define IL_FOLDER 0
@@ -67,7 +68,7 @@ typedef struct _PAGE_LIST
 	INT dlg_id;
 	INT listview_id;
 
-	BOOLEAN thread;
+	BOOLEAN is_thread;
 } PAGE_LIST, *PPAGE_LIST;
 
 typedef struct _CATEGORY_LIST
