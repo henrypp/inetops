@@ -2093,7 +2093,12 @@ VOID _app_initializepages (
 		page_list[i].hpage = _r_wnd_createwindow (_r_sys_getimagebase (), MAKEINTRESOURCE (page_list[i].dlg_id), hwnd, &PageDlgProc, NULL);
 
 		if (page_list[i].hpage)
+		{
 			_app_setpagepos (hwnd, page_list[i].hpage);
+
+			if (_r_config_getlong (L"CurrentItem", IDD_PAGE_PING, NULL) == page_list[i].dlg_id, NULL)
+				_r_treeview_selectitem (hwnd, IDC_ITEMLIST, page_list[i].hitem);
+		}
 	}
 }
 
@@ -2159,9 +2164,9 @@ VOID _app_initializepage (
 		{
 			_r_updown_setrange (hwnd, IDC_PING_UPDOWN, 1, 1000);
 
-			_r_ctrl_setstring (hwnd, IDC_PING_HOST, _r_obj_getstring (_r_config_getstring (L"PingAddress", APP_HOST)));
+			_r_ctrl_setstring (hwnd, IDC_PING_HOST, _r_obj_getstring (_r_config_getstring (L"PingAddress", APP_HOST, NULL)));
 
-			SetDlgItemInt (hwnd, IDC_PING_RETRIES, _r_config_getlong (L"PingRetries", 5), TRUE);
+			SetDlgItemInt (hwnd, IDC_PING_RETRIES, _r_config_getlong (L"PingRetries", 5, NULL), TRUE);
 
 			_r_listview_setstyle (hwnd, IDC_PING_RESULT, EX_STYLE, FALSE);
 
@@ -2200,11 +2205,11 @@ VOID _app_initializepage (
 
 			_r_listview_additem (hwnd, IDC_SPEEDMETER_RESULT, item_id++, L"Recieved data length", IL_SUCCESS, 2, I_DEFAULT);
 
-			_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_LINK, _r_obj_getstring (_r_config_getstring (L"SpeedmeterLink", APP_HOST)));
+			_r_ctrl_setstring (hwnd, IDC_SPEEDMETER_LINK, _r_obj_getstring (_r_config_getstring (L"SpeedmeterLink", APP_HOST, NULL)));
 
 			_r_updown_setrange (hwnd, IDC_SPEEDMETER_UPDOWN, 0, 1000);
 
-			SetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, _r_config_getlong (L"SpeedMeterLimit", 10), TRUE);
+			SetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, _r_config_getlong (L"SpeedMeterLimit", 10, NULL), TRUE);
 
 			break;
 		}
@@ -2214,7 +2219,7 @@ VOID _app_initializepage (
 			_r_ctrl_setstring (
 				hwnd,
 				IDC_URLDECODER_LINK,
-				_r_obj_getstring (_r_config_getstring (L"UrlDecoderLink", L"%22%23%24%25%26%27%28%29%2A%2C%3B%3F%5B%5D%5E%60%7B%7D"))
+				_r_obj_getstring (_r_config_getstring (L"UrlDecoderLink", L"%22%23%24%25%26%27%28%29%2A%2C%3B%3F%5B%5D%5E%60%7B%7D", NULL))
 			);
 
 			break;
@@ -2222,7 +2227,7 @@ VOID _app_initializepage (
 
 		case IDD_PAGE_HOSTADDR:
 		{
-			_r_ctrl_setstring (hwnd, IDC_HOSTADDR_HOST, _r_obj_getstring (_r_config_getstring (L"HostAddrAddress", APP_HOST)));
+			_r_ctrl_setstring (hwnd, IDC_HOSTADDR_HOST, _r_obj_getstring (_r_config_getstring (L"HostAddrAddress", APP_HOST, NULL)));
 
 			_r_listview_setstyle (hwnd, IDC_HOSTADDR_RESULT, EX_STYLE, TRUE);
 
@@ -2240,16 +2245,16 @@ VOID _app_initializepage (
 
 		case IDD_PAGE_WHOIS:
 		{
-			_r_ctrl_setstring (hwnd, IDC_WHOIS_HOST, _r_obj_getstring (_r_config_getstring (L"WhoisAddress", APP_HOST)));
+			_r_ctrl_setstring (hwnd, IDC_WHOIS_HOST, _r_obj_getstring (_r_config_getstring (L"WhoisAddress", APP_HOST, NULL)));
 
 			for (ULONG_PTR i = 0; i < WHOIS_COUNT; i++)
 				_r_combobox_insertitem (hwnd, IDC_WHOIS_SERVER, (INT)i, whois_servers[i].server, 0);
 
-			item_id = _r_config_getlong (L"WhoisServer", 0);
+			item_id = _r_config_getlong (L"WhoisServer", 0, NULL);
 
 			if (item_id == CB_ERR)
 			{
-				_r_ctrl_setstring (hwnd, IDC_WHOIS_SERVER, _r_obj_getstring (_r_config_getstring (L"WhoisServerCustom", whois_servers[0].server)));
+				_r_ctrl_setstring (hwnd, IDC_WHOIS_SERVER, _r_obj_getstring (_r_config_getstring (L"WhoisServerCustom", whois_servers[0].server, NULL)));
 			}
 			else
 			{
@@ -2283,8 +2288,8 @@ VOID _app_initializepage (
 			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Server", IL_SUCCESS, 1, I_DEFAULT);
 			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Status", IL_SUCCESS, 1, I_DEFAULT);
 
-			_r_ctrl_setstring (hwnd, IDC_URLINFO_LINK, _r_obj_getstring (_r_config_getstring (L"UrlInfoLink", APP_HOST)));
-			_r_ctrl_checkbutton (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE));
+			_r_ctrl_setstring (hwnd, IDC_URLINFO_LINK, _r_obj_getstring (_r_config_getstring (L"UrlInfoLink", APP_HOST, NULL)));
+			_r_ctrl_checkbutton (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE, NULL));
 
 			_r_ctrl_sendcommand (hwnd, IDC_URLINFO_HEADER_CHK, 0);
 
@@ -2312,7 +2317,7 @@ VOID _app_initializepage (
 			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Город", IL_SUCCESS, 0, I_DEFAULT);
 			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Координаты", IL_SUCCESS, 0, I_DEFAULT);
 
-			_r_ctrl_checkbutton (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE));
+			_r_ctrl_checkbutton (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE, NULL));
 
 			_r_ctrl_sendcommand (hwnd, IDC_IP_REFRESH, 0);
 
@@ -2591,7 +2596,7 @@ INT_PTR WINAPI PageDlgProc (
 			{
 				GetDlgItemTextW (hwnd, IDC_PING_HOST, buffer, RTL_NUMBER_OF (buffer));
 
-				_r_config_setstring (L"PingAddress", buffer);
+				_r_config_setstring (L"PingAddress", buffer, NULL);
 			}
 
 			if (GetDlgItem (hwnd, IDC_PING_RETRIES))
@@ -2599,7 +2604,7 @@ INT_PTR WINAPI PageDlgProc (
 				item_id = GetDlgItemInt (hwnd, IDC_PING_RETRIES, &is_translated, TRUE);
 
 				if (is_translated)
-					_r_config_setlong (L"PingRetries", item_id);
+					_r_config_setlong (L"PingRetries", item_id, NULL);
 			}
 
 			if (GetDlgItem (hwnd, IDC_SPEEDMETER_LINK))
@@ -2607,45 +2612,45 @@ INT_PTR WINAPI PageDlgProc (
 				item_id = GetDlgItemInt (hwnd, IDC_SPEEDMETER_LIMIT, &is_translated, TRUE);
 
 				if (is_translated)
-					_r_config_setlong (L"SpeedMeterLimit", item_id);
+					_r_config_setlong (L"SpeedMeterLimit", item_id, NULL);
 
 				GetDlgItemTextW (hwnd, IDC_SPEEDMETER_LINK, buffer, RTL_NUMBER_OF (buffer));
 
-				_r_config_setstring (L"SpeedmeterLink", buffer);
+				_r_config_setstring (L"SpeedmeterLink", buffer, NULL);
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLDECODER_LINK))
 			{
 				GetDlgItemTextW (hwnd, IDC_URLDECODER_LINK, buffer, RTL_NUMBER_OF (buffer));
 
-				_r_config_setstring (L"UrlDecoderLink", buffer);
+				_r_config_setstring (L"UrlDecoderLink", buffer, NULL);
 			}
 
 			if (GetDlgItem (hwnd, IDC_HOSTADDR_HOST))
 			{
 				GetDlgItemTextW (hwnd, IDC_HOSTADDR_HOST, buffer, RTL_NUMBER_OF (buffer));
 
-				_r_config_setstring (L"HostAddrAddress", buffer);
+				_r_config_setstring (L"HostAddrAddress", buffer, NULL);
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLINFO_LINK))
 			{
 				GetDlgItemTextW (hwnd, IDC_URLINFO_LINK, buffer, RTL_NUMBER_OF (buffer));
 
-				_r_config_setstring (L"UrlInfoLink", buffer);
+				_r_config_setstring (L"UrlInfoLink", buffer, NULL);
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLINFO_HEADER_CHK))
-				_r_config_setboolean (L"UrlInfoShowHeader", _r_ctrl_isbuttonchecked (hwnd, IDC_URLINFO_HEADER_CHK));
+				_r_config_setboolean (L"UrlInfoShowHeader", _r_ctrl_isbuttonchecked (hwnd, IDC_URLINFO_HEADER_CHK), NULL);
 
 			if (GetDlgItem (hwnd, IDC_IP_EXTERNAL_CHK))
-				_r_config_setboolean (L"RetrieveExternalIp", _r_ctrl_isbuttonchecked (hwnd, IDC_IP_EXTERNAL_CHK));
+				_r_config_setboolean (L"RetrieveExternalIp", _r_ctrl_isbuttonchecked (hwnd, IDC_IP_EXTERNAL_CHK), NULL);
 
 			if (GetDlgItem (hwnd, IDC_WHOIS_HOST))
 			{
 				GetDlgItemTextW (hwnd, IDC_WHOIS_HOST, buffer, RTL_NUMBER_OF (buffer));
 
-				_r_config_setstring (L"WhoisAddress", buffer);
+				_r_config_setstring (L"WhoisAddress", buffer, NULL);
 			}
 
 			if (GetDlgItem (hwnd, IDC_WHOIS_SERVER))
@@ -2656,10 +2661,10 @@ INT_PTR WINAPI PageDlgProc (
 				{
 					GetDlgItemTextW (hwnd, IDC_WHOIS_SERVER, buffer, RTL_NUMBER_OF (buffer));
 
-					_r_config_setstring (L"WhoisServerCustom", buffer);
+					_r_config_setstring (L"WhoisServerCustom", buffer, NULL);
 				}
 
-				_r_config_setlong (L"WhoisServer", item_id);
+				_r_config_setlong (L"WhoisServer", item_id, NULL);
 			}
 
 			break;
@@ -3001,7 +3006,7 @@ LRESULT CALLBACK DlgProc (
 
 			if (hmenu)
 			{
-				_r_menu_checkitem (hmenu, IDM_ALWAYSONTOP_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"AlwaysOnTop", FALSE));
+				_r_menu_checkitem (hmenu, IDM_ALWAYSONTOP_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"AlwaysOnTop", FALSE, NULL));
 				_r_menu_checkitem (hmenu, IDM_DARKMODE_CHK, 0, MF_BYCOMMAND, _r_theme_isenabled ());
 				_r_menu_checkitem (hmenu, IDM_CHECKUPDATES_CHK, 0, MF_BYCOMMAND, _r_update_isenabled (FALSE));
 
@@ -3020,7 +3025,7 @@ LRESULT CALLBACK DlgProc (
 
 			page_id = _app_getcurrentpage (hwnd);
 
-			_app_setcurrentpage (hwnd, _r_config_getlong (L"LastItem", (LONG)_app_getpageid (IDD_PAGE_SYSINFO)));
+			_app_setcurrentpage (hwnd, _r_config_getlong (L"LastItem", (LONG)_app_getpageid (IDD_PAGE_SYSINFO), NULL));
 
 			SetTimer (hwnd, 1337, 1000, &TimerProc);
 
@@ -3089,7 +3094,7 @@ LRESULT CALLBACK DlgProc (
 			for (INT i = 0; i < PAGE_COUNT; i++)
 				page_list[i].is_thread = FALSE;
 
-			_r_config_setlong (L"LastItem", (LONG)_app_getcurrentpage (hwnd));
+			_r_config_setlong (L"LastItem", (LONG)_app_getcurrentpage (hwnd), NULL);
 
 			_r_imagelist_destroy (config.himglist);
 
@@ -3168,6 +3173,8 @@ LRESULT CALLBACK DlgProc (
 
 					if (page_list[page_id_new].hpage)
 					{
+						_r_config_setlong (L"CurrentItem", page_list[page_id_new].dlg_id, NULL);
+
 						_app_setpagepos (hwnd, page_list[page_id_new].hpage);
 
 						_app_resizecolumns (hwnd, page_id_new);
@@ -3241,10 +3248,10 @@ LRESULT CALLBACK DlgProc (
 				{
 					BOOLEAN new_val;
 
-					new_val = !_r_config_getboolean (L"AlwaysOnTop", FALSE);
+					new_val = !_r_config_getboolean (L"AlwaysOnTop", FALSE, NULL);
 
 					_r_menu_checkitem (GetMenu (hwnd), ctrl_id, 0, MF_BYCOMMAND, new_val);
-					_r_config_setboolean (L"AlwaysOnTop", new_val);
+					_r_config_setboolean (L"AlwaysOnTop", new_val, NULL);
 
 					_r_wnd_top (hwnd, new_val);
 
