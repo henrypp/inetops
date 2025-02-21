@@ -57,24 +57,25 @@ typedef struct _STATIC_DATA
 
 typedef struct _PAGE_LIST
 {
-	INT title;
-	INT description;
-
-	HWND hpage;
 	HTREEITEM hitem;
+	HWND hpage;
 
 	ULONG_PTR category;
 
 	INT dlg_id;
 	INT listview_id;
 
+	INT title;
+	INT description;
+
 	BOOLEAN is_thread;
 } PAGE_LIST, *PPAGE_LIST;
 
 typedef struct _CATEGORY_LIST
 {
-	INT name;
 	HTREEITEM hitem;
+
+	INT name;
 } CATEGORY_LIST, *PCATEGORY_LIST;
 
 typedef struct _WHOIS_LIST
@@ -82,46 +83,5 @@ typedef struct _WHOIS_LIST
 	WCHAR server[128];
 } WHOIS_LIST, *PWHOIS_LIST;
 
-// http://www.iana.org/domains/root/db/
+// https://www.iana.org/domains/root/db
 WHOIS_LIST whois_servers[WHOIS_COUNT] = {0};
-
-//typedef struct _sockaddr_in {
-//        short   sin_family;
-//        u_short sin_port;
-//        struct  in_addr sin_addr;
-//        char    sin_zero[8];
-//} sockaddr_in, *psockaddr_in;
-//
-//typedef struct  _hostent {
-//        char    FAR * h_name;           /* official name of host */
-//        char    FAR * FAR * h_aliases;  /* alias list */
-//        short   h_addrtype;             /* host address type */
-//        short   h_length;               /* length of address */
-//        char    FAR * FAR * h_addr_list; /* list of addresses */
-//#define h_addr  h_addr_list[0]          /* address, for backward compat */
-//} hostent, *phostent;
-//
-//typedef struct _in_addr {
-//        union {
-//                struct { u_char s_b1,s_b2,s_b3,s_b4; } S_un_b;
-//                struct { u_short s_w1,s_w2; } S_un_w;
-//                u_long S_addr;
-//        } S_un;
-//#define s_addr  S_un.S_addr
-//                                /* can be used for most tcp & ip code */
-//#define s_host  S_un.S_un_b.s_b2
-//                                /* host on imp */
-//#define s_net   S_un.S_un_b.s_b1
-//                                /* network */
-//#define s_imp   S_un.S_un_w.s_w2
-//                                /* imp */
-//#define s_impno S_un.S_un_b.s_b4
-//                                /* imp # */
-//#define s_lh    S_un.S_un_b.s_b3
-//                                /* logical host */
-//} in_addr, *pin_addr;
-//
-//typedef struct _sockaddr {
-//        u_short sa_family;              /* address family */
-//        char    sa_data[14];            /* up to 14 bytes of direct address */
-//} sockaddr, *psockaddr;
