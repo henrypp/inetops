@@ -189,8 +189,8 @@ ULONG_PTR _app_getcurrentpage (
 	//hitem = _r_treeview_getnextitem (hwnd, IDC_ITEMLIST, NULL, TVGN_CARET);
 	hitem = (HTREEITEM)_r_wnd_sendmessage (hwnd, IDC_ITEMLIST, TVM_GETNEXTITEM, TVGN_CARET, 0);
 
-	if (!_r_treeview_getnextitem (hwnd, IDC_ITEMLIST, hitem, TVGN_PARENT))
-		hitem = _r_treeview_getnextitem (hwnd, IDC_ITEMLIST, hitem, TVGN_CHILD);
+	if (!_r_treeview_getnextitem (hwnd, IDC_ITEMLIST, TVGN_PARENT, hitem))
+		hitem = _r_treeview_getnextitem (hwnd, IDC_ITEMLIST, TVGN_CHILD, hitem);
 
 	if (!hitem)
 		return 0;
