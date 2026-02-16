@@ -1202,7 +1202,7 @@ NTSTATUS _app_tool_urlinfo (
 
 	if (!hsession)
 	{
-		_r_show_errormessage (hwnd, NULL, NtLastError (), L"Произошла ошибка при создания сессии", FALSE);
+		_r_show_errormessage (hwnd, NULL, NtLastError (), L"Произошла ошибка при создания сессии", ET_WINDOWS);
 
 		return STATUS_SUCCESS;
 	}
@@ -1214,7 +1214,7 @@ NTSTATUS _app_tool_urlinfo (
 
 	if (status != STATUS_SUCCESS)
 	{
-		_r_show_errormessage (hwnd, NULL, status, L"Произошла ошибка при открытии ссылки", FALSE);
+		_r_show_errormessage (hwnd, NULL, status, L"Произошла ошибка при открытии ссылки", ET_WINDOWS);
 	}
 	else
 	{
@@ -2993,9 +2993,9 @@ LRESULT CALLBACK DlgProc (
 
 			if (status != ERROR_SUCCESS)
 			{
-				_r_show_errormessage (hwnd, NULL, status, NULL, FALSE);
+				_r_show_errormessage (hwnd, NULL, status, NULL, ET_WINDOWS);
 
-				RtlExitUserProcess (status);
+				NtTerminateProcess (NtCurrentProcess (), status);
 			}
 
 			_r_treeview_setstyle (hwnd, IDC_ITEMLIST, TVS_EX_DOUBLEBUFFER | TVS_EX_FADEINOUTEXPANDOS, 0, 0);
