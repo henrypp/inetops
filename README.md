@@ -41,9 +41,9 @@ To activate portable mode, create "inetops.ini" in application folder, or move i
 
 ### Donate:
 - [Bitcoin](https://www.blockchain.com/btc/address/1LrRTXPsvHcQWCNZotA9RcwjsGcRghG96c) (BTC)
-- [Ethereum](https://www.blockchain.com/explorer/addresses/eth/0xe2C84A62eb2a4EF154b19bec0c1c106734B95960) (ETC)
-- [Paypal](https://paypal.me/henrypp) (USD)
+- [Ethereum](https://www.blockchain.com/explorer/addresses/eth/0xe2C84A62eb2a4EF154b19bec0c1c106734B95960) (ETH)
 - [Yandex Money](https://yoomoney.ru/to/4100115776040583) (RUB)
+- [Paypal](https://paypal.me/henrypp) (USD)
 
 ### GPG Signature:
 Binaries have GPG signature `inetops.exe.sig` in application folder.
@@ -56,4 +56,4 @@ Binaries have GPG signature `inetops.exe.sig` in application folder.
 - Support: sforce5@mail.ru
 ---
 
-(c) 2012-2025 Henry++
+(c) 2012-2026 Henry++
