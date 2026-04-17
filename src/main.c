@@ -55,10 +55,10 @@ VOID _app_imagelist_init (
 
 	icon_size = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
 
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER), icon_size, &config.hfolder);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER_CURRENT), icon_size, &config.hfolder_current);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_SUCCESS), icon_size, &config.hsuccess);
-	_r_sys_loadicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FAULT), icon_size, &config.hfailed);
+	_r_sys_loadicon (&config.hfolder, _r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER), icon_size);
+	_r_sys_loadicon (&config.hfolder_current, _r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FOLDER_CURRENT), icon_size);
+	_r_sys_loadicon (&config.hsuccess, _r_sys_getimagebase (), MAKEINTRESOURCE (IDI_SUCCESS), icon_size);
+	_r_sys_loadicon (&config.hfailed, _r_sys_getimagebase (), MAKEINTRESOURCE (IDI_FAULT), icon_size);
 
 	if (config.himglist)
 	{
@@ -66,7 +66,7 @@ VOID _app_imagelist_init (
 	}
 	else
 	{
-		status = _r_imagelist_create (icon_size, icon_size, ILC_COLOR32 | ILC_HIGHQUALITYSCALE, 0, 5, &config.himglist);
+		status = _r_imagelist_create (&config.himglist, icon_size, icon_size, ILC_COLOR32 | ILC_HIGHQUALITYSCALE, 0, 5);
 
 		if (SUCCEEDED (status))
 		{
@@ -274,7 +274,7 @@ NTSTATUS _app_tool_ping (
 
 	_r_obj_initializestringref (&sr, buffer);
 
-	status = _r_str_unicode2multibyte (&sr, &icmp_echo);
+	status = _r_str_unicode2multibyte (&icmp_echo, &sr);
 
 	if (!NT_SUCCESS (status))
 		goto CleanupExit;
@@ -306,7 +306,7 @@ NTSTATUS _app_tool_ping (
 				{
 					_r_obj_initializestringref (&sr, ipaddr);
 
-					status = _r_str_unicode2multibyte (&sr, &bytes);
+					status = _r_str_unicode2multibyte (&bytes, &sr);
 
 					if (!NT_SUCCESS (status))
 						goto CleanupExit;
@@ -796,7 +796,7 @@ NTSTATUS _app_tool_whois (
 
 		_r_obj_initializebyteref (&br, bytes);
 
-		status = _r_str_multibyte2unicode (&br, &string);
+		status = _r_str_multibyte2unicode (&string, &br);
 
 		if (NT_SUCCESS (status))
 		{
@@ -1070,7 +1070,7 @@ VOID _app_tool_sysinfo (
 	_r_listview_setitem (hwnd, IDC_SYSINFO, item_id++, 1, (NtLastError () == WSAEAFNOSUPPORT) ? L"Off" : L"On", I_DEFAULT, I_DEFAULT, I_DEFAULT);
 	closesocket (sock);
 
-	status = _r_sys_getusername (_r_sys_getcurrenttoken ()->token_sid, FALSE, &string);
+	status = _r_sys_getusername (&string, _r_sys_getcurrenttoken ()->token_sid, FALSE);
 
 	if (NT_SUCCESS (status))
 	{
