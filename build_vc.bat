@@ -20,9 +20,6 @@ goto end
 
 :start
 
-msbuild inetops.sln -property:Configuration=Release -property:Platform=Win32 -verbosity:normal
-if %ERRORLEVEL% neq 0 goto end
-
 msbuild inetops.sln -property:Configuration=Release -property:Platform=x64 -verbosity:normal
 if %ERRORLEVEL% neq 0 goto end
 
