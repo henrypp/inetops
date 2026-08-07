@@ -1,5 +1,5 @@
 ﻿// InetOps
-// Copyright (c) 2012-2025 Henry++
+// Copyright (c) 2012-2026 Henry++
 
 #pragma once
 

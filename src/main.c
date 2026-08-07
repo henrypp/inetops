@@ -1,5 +1,5 @@
 ﻿// InetOps
-// Copyright (c) 2012-2025 Henry++
+// Copyright (c) 2012-2026 Henry++
 
 #include "routine.h"
 
@@ -62,7 +62,7 @@ VOID _app_imagelist_init (
 
 	if (config.himglist)
 	{
-		_r_imagelist_setsize (config.himglist, icon_size);
+		_r_imagelist_setsize (config.himglist, icon_size, icon_size);
 	}
 	else
 	{
@@ -274,7 +274,7 @@ NTSTATUS _app_tool_ping (
 
 	_r_obj_initializestringref (&sr, buffer);
 
-	status = _r_str_unicode2multibyte (&icmp_echo, &sr);
+	status = _r_str_unicode2multibyte (&sr, &icmp_echo);
 
 	if (!NT_SUCCESS (status))
 		goto CleanupExit;
@@ -306,7 +306,7 @@ NTSTATUS _app_tool_ping (
 				{
 					_r_obj_initializestringref (&sr, ipaddr);
 
-					status = _r_str_unicode2multibyte (&bytes, &sr);
+					status = _r_str_unicode2multibyte (&sr, &bytes);
 
 					if (!NT_SUCCESS (status))
 						goto CleanupExit;
@@ -796,7 +796,7 @@ NTSTATUS _app_tool_whois (
 
 		_r_obj_initializebyteref (&br, bytes);
 
-		status = _r_str_multibyte2unicode (&string, &br);
+		status = _r_str_multibyte2unicode (&br, &string);
 
 		if (NT_SUCCESS (status))
 		{
@@ -2289,9 +2289,9 @@ VOID _app_initializepage (
 			_r_listview_additem (hwnd, IDC_URLINFO_RESULT, item_id++, L"Status", IL_SUCCESS, 1, I_DEFAULT);
 
 			_r_ctrl_setstring (hwnd, IDC_URLINFO_LINK, _r_obj_getstring (_r_config_getstring (L"UrlInfoLink", APP_HOST, NULL)));
-			_r_ctrl_checkbutton (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE, NULL));
+			_r_button_setcheck (hwnd, IDC_URLINFO_HEADER_CHK, _r_config_getboolean (L"UrlInfoShowHeader", FALSE, NULL));
 
-			_r_ctrl_sendcommand (hwnd, IDC_URLINFO_HEADER_CHK, 0);
+			_r_wnd_sendcommand (hwnd, IDC_URLINFO_HEADER_CHK, 0);
 
 			break;
 		}
@@ -2317,9 +2317,9 @@ VOID _app_initializepage (
 			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Город", IL_SUCCESS, 0, I_DEFAULT);
 			_r_listview_additem (hwnd, IDC_IP_RESULT, item_id++, L"Координаты", IL_SUCCESS, 0, I_DEFAULT);
 
-			_r_ctrl_checkbutton (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE, NULL));
+			_r_button_setcheck (hwnd, IDC_IP_EXTERNAL_CHK, _r_config_getboolean (L"RetrieveExternalIp", FALSE, NULL));
 
-			_r_ctrl_sendcommand (hwnd, IDC_IP_REFRESH, 0);
+			_r_wnd_sendcommand (hwnd, IDC_IP_REFRESH, 0);
 
 			break;
 		}
@@ -2335,7 +2335,7 @@ VOID _app_initializepage (
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 2, L"Type", 50, 0);
 			_r_listview_addcolumn (hwnd, IDC_SHAREDINFO, 3, L"Connected", 50, 0);
 
-			_r_ctrl_sendcommand (hwnd, IDC_SHAREDINFO_START, 0);
+			_r_wnd_sendcommand (hwnd, IDC_SHAREDINFO_START, 0);
 
 			break;
 		}
@@ -2641,10 +2641,10 @@ INT_PTR WINAPI PageDlgProc (
 			}
 
 			if (GetDlgItem (hwnd, IDC_URLINFO_HEADER_CHK))
-				_r_config_setboolean (L"UrlInfoShowHeader", _r_ctrl_isbuttonchecked (hwnd, IDC_URLINFO_HEADER_CHK), NULL);
+				_r_config_setboolean (L"UrlInfoShowHeader", _r_button_ischecked (hwnd, IDC_URLINFO_HEADER_CHK), NULL);
 
 			if (GetDlgItem (hwnd, IDC_IP_EXTERNAL_CHK))
-				_r_config_setboolean (L"RetrieveExternalIp", _r_ctrl_isbuttonchecked (hwnd, IDC_IP_EXTERNAL_CHK), NULL);
+				_r_config_setboolean (L"RetrieveExternalIp", _r_button_ischecked (hwnd, IDC_IP_EXTERNAL_CHK), NULL);
 
 			if (GetDlgItem (hwnd, IDC_WHOIS_HOST))
 			{
@@ -2907,7 +2907,7 @@ INT_PTR WINAPI PageDlgProc (
 				{
 					BOOLEAN is_checked;
 
-					is_checked = _r_ctrl_isbuttonchecked (hwnd, IDC_URLINFO_HEADER_CHK);
+					is_checked = _r_button_ischecked (hwnd, IDC_URLINFO_HEADER_CHK);
 
 					ShowWindow (GetDlgItem (hwnd, IDC_URLINFO_HEADER), is_checked ? SW_SHOW : SW_HIDE);
 					ShowWindow (GetDlgItem (hwnd, IDC_URLINFO_RESULT), is_checked ? SW_HIDE : SW_SHOW);
@@ -2917,7 +2917,7 @@ INT_PTR WINAPI PageDlgProc (
 
 				case IDC_IP_REFRESH:
 				{
-					if (_r_ctrl_isbuttonchecked (hwnd, IDC_IP_EXTERNAL_CHK))
+					if (_r_button_ischecked (hwnd, IDC_IP_EXTERNAL_CHK))
 					{
 						_r_sys_createthread (NULL, NtCurrentProcess (), &_app_tool_externalip, hwnd, NULL, L"ExternalIp");
 					}
